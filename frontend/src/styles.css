@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Aptos", "Segoe UI", sans-serif;
+  background: #091522;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+  opacity: 0.25;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(22px);
+}
+
+.dark .glass-panel {
+  background: rgba(8, 16, 26, 0.72);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.14) 25%, rgba(226, 232, 240, 0.5) 37%, rgba(148, 163, 184, 0.14) 63%);
+  background-size: 300% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, rgba(71, 85, 105, 0.22) 25%, rgba(100, 116, 139, 0.38) 37%, rgba(71, 85, 105, 0.22) 63%);
+  background-size: 300% 100%;
+}
+
+.leaflet-container {
+  background: #102133;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgba(7, 16, 24, 0.94);
+  color: #eef4f8;
+  border: 1px solid rgba(184, 242, 230, 0.24);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+.leaflet-control-zoom a {
+  background: rgba(7, 16, 24, 0.92);
+  color: #eef4f8;
+  border-bottom: 1px solid rgba(184, 242, 230, 0.18);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 999px;
+}
