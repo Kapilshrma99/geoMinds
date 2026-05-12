@@ -27,7 +27,7 @@ services:
       GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
       GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
     ports:
-      - "8080:8080"
+      - "8084:8080"
     volumes:
       - geoserver_data:/opt/geoserver_data/
 
@@ -40,6 +40,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - ./:/workspace
       - ./backend:/app
       - uploaded_files:/app/uploads
     depends_on:
@@ -57,6 +58,7 @@ services:
     ports:
       - "5173:5173"
     volumes:
+      - ./:/workspace
       - ./frontend:/app
       - /app/node_modules
     depends_on:
