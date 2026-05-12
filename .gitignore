@@ -10,3 +10,4 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 postgres_data/
 geoserver_data/
+.env
