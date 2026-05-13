@@ -113,7 +113,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     citations: list[str]
-    agent_log: list[dict[str, str]]
+    agent_log: list[dict[str, Any]]
 
 
 class AnalyzeResponse(BaseModel):
@@ -122,7 +122,7 @@ class AnalyzeResponse(BaseModel):
     match: MatchOut | None
     conflicts: list[ConflictOut]
     report: ReportOut
-    agent_log: list[dict[str, str]]
+    agent_log: list[dict[str, Any]]
 
 
 class StreamEvent(BaseModel):
@@ -130,7 +130,7 @@ class StreamEvent(BaseModel):
     delta: str | None = None
     answer: str | None = None
     citations: list[str] | None = None
-    agent_log: list[dict[str, str]] | None = None
+    agent_log: list[dict[str, Any]] | None = None
 
 
 Token.model_rebuild()

@@ -61,6 +61,7 @@ def persist_agent_log(db, entry: dict[str, str]) -> AgentExecutionLog:
             "document_id": row.document_id,
             "property_data_id": row.property_data_id,
             "report_id": row.report_id,
+            "metadata": row.log_metadata or {},
             "created_at": row.created_at.isoformat(),
         }
     )
@@ -68,4 +69,13 @@ def persist_agent_log(db, entry: dict[str, str]) -> AgentExecutionLog:
 
 
 def public_agent_logs(logs: list[dict[str, str]]) -> list[dict[str, str]]:
-    return [{"agent": entry["agent"], "message": entry["message"], "status": entry.get("status", "completed")} for entry in logs]
+    return [
+        {
+            "agent": entry["agent"],
+            "message": entry["message"],
+            "status": entry.get("status", "completed"),
+            "created_at": entry.get("created_at"),
+            "metadata": entry.get("metadata") or {},
+        }
+        for entry in logs
+    ]

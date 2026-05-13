@@ -20,6 +20,21 @@ services:
       timeout: 5s
       retries: 5
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: geomind-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@geomind.ai}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+
   geoserver:
     image: docker.osgeo.org/geoserver:2.26.x
     container_name: geomind-geoserver
@@ -66,5 +81,6 @@ services:
 
 volumes:
   postgres_data:
+  pgadmin_data:
   geoserver_data:
   uploaded_files:

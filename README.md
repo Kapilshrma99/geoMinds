@@ -40,7 +40,7 @@ GeoMind AI now includes a centralized Gemini service layer with optional Vertex 
   - Risk analysis and PDF report generation
   - GeoServer URL publishing helpers
 - PostgreSQL/PostGIS schema and seed parcels
-- Docker Compose for frontend, backend, database, and GeoServer
+- Docker Compose for frontend, backend, database, pgAdmin, and GeoServer
 - Demo sample file in [demo/sample-land-record.txt](/c:/docker-workspace/geomaind/demo/sample-land-record.txt)
 
 ## Architecture
@@ -167,7 +167,19 @@ docker compose up --build
 3. Open:
    - Frontend: `http://localhost:5173`
    - Backend docs: `http://localhost:8000/docs`
-   - GeoServer: `http://localhost:8080/geoserver`
+   - pgAdmin: `http://localhost:5050`
+   - GeoServer: `http://localhost:8084`
+
+4. pgAdmin login:
+   - Email: `admin@geomind.ai` or `PGADMIN_DEFAULT_EMAIL`
+   - Password: `admin123` or `PGADMIN_DEFAULT_PASSWORD`
+
+5. To register the GeoMind database inside pgAdmin, use:
+   - Host: `db`
+   - Port: `5432`
+   - Database: `geomind`
+   - Username: `geomind`
+   - Password: `geomind`
 
 ## Demo Credentials
 

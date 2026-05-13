@@ -3,33 +3,36 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#0d1b2a",
-        haze: "#eef4f8",
-        mint: "#b8f2e6",
-        gold: "#f4d35e",
-        coral: "#ee6c4d",
-        moss: "#2a9d8f",
-        slategeo: "#12263a",
-        tide: "#1f4e5f",
-        fog: "#dce8ee",
+        ink: "#040b14",
+        haze: "#eaf2ff",
+        mint: "#67f7c4",
+        gold: "#ffbf69",
+        coral: "#ff6f7d",
+        moss: "#2fd2b5",
+        slategeo: "#0c1b2d",
+        tide: "#15304d",
+        fog: "#8ea4bf",
+        storm: "#0b1624",
+        steel: "#18283a",
       },
       boxShadow: {
-        glow: "0 12px 40px rgba(13, 27, 42, 0.18)",
-        panel: "0 24px 60px rgba(9, 25, 39, 0.16)",
+        glow: "0 0 0 1px rgba(103,247,196,0.08), 0 24px 70px rgba(0,0,0,0.45)",
+        panel: "0 24px 80px rgba(0, 0, 0, 0.42)",
       },
       backgroundImage: {
-        mesh: "radial-gradient(circle at top left, rgba(184,242,230,0.35), transparent 40%), radial-gradient(circle at top right, rgba(244,211,94,0.18), transparent 28%), linear-gradient(135deg, #f7fbfd 0%, #ebf3f6 40%, #d8e6ed 100%)",
-        command: "radial-gradient(circle at 20% 20%, rgba(46, 196, 182, 0.16), transparent 22%), radial-gradient(circle at 80% 0%, rgba(255, 209, 102, 0.16), transparent 18%), linear-gradient(180deg, rgba(10,22,34,0.96) 0%, rgba(18,38,58,0.98) 55%, rgba(11,18,32,1) 100%)",
-        topo: "linear-gradient(135deg, rgba(31,78,95,0.2), rgba(255,255,255,0)), repeating-radial-gradient(circle at center, rgba(18,38,58,0.08) 0 2px, transparent 2px 22px)",
+        mesh: "radial-gradient(circle at 0% 0%, rgba(103,247,196,0.14), transparent 26%), radial-gradient(circle at 100% 0%, rgba(72,169,255,0.12), transparent 22%), linear-gradient(180deg, #030912 0%, #071320 52%, #0a1b2c 100%)",
+        command: "radial-gradient(circle at 20% 16%, rgba(103,247,196,0.14), transparent 20%), radial-gradient(circle at 80% 0%, rgba(255,191,105,0.12), transparent 18%), linear-gradient(180deg, rgba(3,9,18,0.96) 0%, rgba(7,19,32,0.98) 52%, rgba(10,27,44,1) 100%)",
+        topo: "linear-gradient(135deg, rgba(103,247,196,0.08), transparent 40%), repeating-radial-gradient(circle at center, rgba(103,247,196,0.06) 0 2px, transparent 2px 22px)",
       },
       fontFamily: {
-        sans: ["'Aptos'", "'Segoe UI'", "sans-serif"],
-        display: ["'Bahnschrift'", "'Aptos'", "sans-serif"],
+        sans: ["'Plus Jakarta Sans'", "'Segoe UI'", "sans-serif"],
+        display: ["'Space Grotesk'", "'Plus Jakarta Sans'", "sans-serif"],
       },
       animation: {
         float: "float 8s ease-in-out infinite",
         shimmer: "shimmer 1.8s linear infinite",
         pulsegrid: "pulsegrid 5s ease-in-out infinite",
+        pulseglow: "pulseglow 2.4s ease-in-out infinite",
       },
       keyframes: {
         float: {
@@ -43,6 +46,10 @@ export default {
         pulsegrid: {
           "0%, 100%": { opacity: "0.35" },
           "50%": { opacity: "0.85" },
+        },
+        pulseglow: {
+          "0%, 100%": { boxShadow: "0 0 0 rgba(103,247,196,0.0)" },
+          "50%": { boxShadow: "0 0 24px rgba(103,247,196,0.3)" },
         },
       },
     },

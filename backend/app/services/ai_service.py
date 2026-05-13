@@ -234,16 +234,21 @@ Document:
         ]
         prompt = (
             "Generate a property intelligence report as strict JSON with keys: "
-            "risk_score, risk_level, summary, recommendation, reasoning, nearby_disputed_parcels, ownership_analysis, boundary_analysis. "
+            "risk_score, risk_level, summary, executive_summary, recommendation, recommended_actions, reasoning, nearby_disputed_parcels, "
+            "ownership_analysis, boundary_analysis, overlap_metrics, evidence_summary. "
             "Keep risk_score between 0 and 100 and risk_level one of Low, Medium, High. "
+            "The tone must be concise, enterprise-grade, and evidence-led rather than conversational. "
+            "Explain why the parcel is risky using ownership verification, duplicate khasra patterns, spatial overlap, geometry conflict, missing parcel signals, area mismatch, and nearby disputed parcels when present. "
             f"Heuristic baseline score: {heuristic_score}. Heuristic baseline level: {heuristic_level}. "
             f"Property: {json.dumps(extracted_payload)} "
             f"Match: {json.dumps(match_payload)} "
             f"Conflicts: {json.dumps(conflicts_payload)}"
         )
         system_instruction = (
-            "You are GeoMind AI's Risk Analysis and Report Agent. Produce concise enterprise-style land intelligence output. "
-            "Align risk score to the evidence and prefer conservative legal reasoning."
+            "You are GeoMind AI's Risk Analysis and Report Agent inside an enterprise land intelligence platform. "
+            "Produce boardroom-ready analysis with clear causal reasoning. "
+            "Do not sound like a chatbot. Avoid generic phrases. "
+            "Every major claim must be grounded in the supplied parcel, conflict, or document evidence."
         )
         try:
             result = self._generate_json(model=settings.gemini_report_model, prompt=prompt, system_instruction=system_instruction)
@@ -258,11 +263,20 @@ Document:
                     f"Property {extracted_payload.get('khasra_no') or 'unknown'} in "
                     f"{extracted_payload.get('village') or 'unknown village'} is rated {heuristic_level} risk with a score of {heuristic_score}."
                 ),
+                "executive_summary": (
+                    "Ownership and spatial verification were synthesized from uploaded document fields, parcel match confidence, and conflict scans."
+                ),
                 "recommendation": "Escalate for field verification and legal review." if heuristic_level != "Low" else "Proceed with routine due diligence.",
+                "recommended_actions": [
+                    "Verify cadastral ownership against registry records.",
+                    "Run field boundary confirmation before acquisition." if heuristic_level != "Low" else "Archive the analysis trail for routine compliance.",
+                ],
                 "reasoning": [item["details"] for item in conflicts_payload] or ["No material conflicts detected."],
                 "nearby_disputed_parcels": [],
                 "ownership_analysis": "Ownership signals were compared between the uploaded document and matched parcel records.",
                 "boundary_analysis": "Boundary conflict checks considered overlaps, duplicate parcel identifiers, and area mismatch.",
+                "overlap_metrics": {},
+                "evidence_summary": extracted_payload.get("chunks", [])[:4],
             }, logs
 
     def answer_gis_query(
@@ -284,6 +298,7 @@ Document:
             "Answer the user's GIS/property intelligence question clearly and concretely. "
             "If the question asks why a property is risky, explain using the provided conflict and report context. "
             "If the question asks about overlaps or disputed parcels, summarize the parcel evidence. "
+            "Always cite document or GIS evidence explicitly when available. "
             f"Question: {question}\n"
             f"Property context: {json.dumps(property_payload)}\n"
             f"Parcel context: {json.dumps(parcel_context)}\n"
@@ -292,7 +307,8 @@ Document:
             f"Citations: {json.dumps(citations)}"
         )
         system_instruction = (
-            "You are GeoMind AI's Chat Agent. Answer in a professional tone, grounded in the supplied property and GIS evidence. "
+            "You are GeoMind AI's Chat Agent. Answer in a professional enterprise tone, grounded in the supplied property and GIS evidence. "
+            "Do not sound generic or conversationally vague. "
             "Do not invent parcel ids, owners, or disputes."
         )
         try:
