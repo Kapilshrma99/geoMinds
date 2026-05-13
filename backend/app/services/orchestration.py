@@ -13,6 +13,17 @@ from app.services.document_ai import extract_text, infer_property_fields
 from app.services.gis import detect_conflicts, find_best_match
 from app.services.rag import index_document_chunks
 
+EXTRACTED_PROPERTY_FIELDS = {
+    "owner_name",
+    "khasra_no",
+    "village",
+    "district",
+    "area",
+    "coordinates",
+    "document_date",
+    "chunks",
+}
+
 
 @dataclass
 class AgentContext:
@@ -67,6 +78,7 @@ class DocumentAgent(WorkflowAgent):
         context.emit(self.name, "Extracting text, ownership entities, cadastral identifiers, and cited document chunks.", status="running")
         raw_text = extract_text(context.document.storage_path)
         fields, _ = ai_service.extract_property_data(raw_text=raw_text, filename=context.document.filename)
+        fields = {key: value for key, value in fields.items() if key in EXTRACTED_PROPERTY_FIELDS}
         if not fields.get("chunks"):
             fields["chunks"] = infer_property_fields(raw_text, context.document.filename)["chunks"]
 

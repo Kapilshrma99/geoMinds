@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
-    gemini_api_key: str = "demo-key"
+    gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_report_model: str = "gemini-2.5-pro"
     gemini_embedding_model: str = "gemini-embedding-001"

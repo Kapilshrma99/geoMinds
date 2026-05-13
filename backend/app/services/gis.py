@@ -36,21 +36,32 @@ def parcel_to_geojson_row(db: Session, parcel_id: int) -> dict[str, Any] | None:
 
 
 def find_best_match(db: Session, extracted: ExtractedPropertyData) -> PropertyMatch | None:
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    if extracted.khasra_no:
+        conditions.append("khasra_no = :khasra_no")
+        params["khasra_no"] = extracted.khasra_no
+    if extracted.village:
+        conditions.append("village ILIKE :village")
+        params["village"] = f"%{extracted.village}%"
+    if not conditions:
+        return None
+
+    order_by = "id"
+    if extracted.khasra_no:
+        order_by = "CASE WHEN khasra_no = :khasra_no THEN 0 ELSE 1 END, id"
+
     parcel = db.execute(
         text(
-            """
+            f"""
             SELECT id, khasra_no, owner_name, village, district, area
             FROM land_parcels
-            WHERE (:khasra_no IS NOT NULL AND khasra_no = :khasra_no)
-               OR (:village IS NOT NULL AND village ILIKE :village)
-            ORDER BY CASE WHEN khasra_no = :khasra_no THEN 0 ELSE 1 END, id
+            WHERE {" OR ".join(conditions)}
+            ORDER BY {order_by}
             LIMIT 1
             """
         ),
-        {
-            "khasra_no": extracted.khasra_no,
-            "village": f"%{extracted.village}%" if extracted.village else None,
-        },
+        params,
     ).mappings().first()
     if not parcel:
         return None
@@ -84,7 +95,7 @@ def detect_conflicts(db: Session, extracted: ExtractedPropertyData, match: Prope
     if not match:
         conflict = ConflictReport(
             property_data_id=extracted.id,
-            parcel_id=0,
+            parcel_id=None,
             conflict_type="missing_match",
             severity="high",
             details="No parcel could be matched from uploaded property metadata.",

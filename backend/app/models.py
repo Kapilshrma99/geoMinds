@@ -83,7 +83,7 @@ class ConflictReport(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     property_data_id: Mapped[int] = mapped_column(ForeignKey("extracted_property_data.id"))
-    parcel_id: Mapped[int] = mapped_column(ForeignKey("land_parcels.id"))
+    parcel_id: Mapped[int | None] = mapped_column(ForeignKey("land_parcels.id"), nullable=True)
     conflict_type: Mapped[str] = mapped_column(String(120))
     severity: Mapped[str] = mapped_column(String(20))
     details: Mapped[str] = mapped_column(Text)

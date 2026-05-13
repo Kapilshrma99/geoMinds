@@ -21,21 +21,29 @@ def get_parcels(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    conditions: list[str] = []
+    params: dict[str, str] = {}
+    if village:
+        conditions.append("village ILIKE :village")
+        params["village"] = f"%{village}%"
+    if district:
+        conditions.append("district ILIKE :district")
+        params["district"] = f"%{district}%"
+    if risk:
+        conditions.append("risk_hint = :risk")
+        params["risk"] = risk
+
     query = """
         SELECT id, khasra_no, owner_name, village, district, area, risk_hint, ST_AsGeoJSON(geom) AS geojson
         FROM land_parcels
-        WHERE (:village IS NULL OR village ILIKE :village)
-          AND (:district IS NULL OR district ILIKE :district)
-          AND (:risk IS NULL OR risk_hint = :risk)
-        ORDER BY id
     """
+    if conditions:
+        query += "\n        WHERE " + " AND ".join(conditions)
+    query += "\n        ORDER BY id"
+
     rows = db.execute(
         text(query),
-        {
-            "village": f"%{village}%" if village else None,
-            "district": f"%{district}%" if district else None,
-            "risk": risk,
-        },
+        params,
     ).mappings().all()
     return [
         {

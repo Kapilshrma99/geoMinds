@@ -26,25 +26,57 @@ class AIService:
         self._configured = False
         self._setup_environment()
 
+    @staticmethod
+    def _looks_like_placeholder(value: str | None) -> bool:
+        if not value:
+            return True
+        normalized = value.strip()
+        if not normalized:
+            return True
+        placeholders = {
+            "demo-key",
+            "your-gemini-api-key",
+            "your-gcp-project-id",
+            "changeme",
+            "change-me",
+        }
+        return normalized.lower() in placeholders
+
+    def _has_api_key(self) -> bool:
+        return not self._looks_like_placeholder(settings.gemini_api_key)
+
+    def _use_vertex_ai(self) -> bool:
+        return settings.google_genai_use_vertexai and not self._looks_like_placeholder(settings.google_cloud_project)
+
+    @staticmethod
+    def _describe_exception(exc: Exception) -> str:
+        message = " ".join(str(exc).split())
+        if not message:
+            return exc.__class__.__name__
+        if len(message) > 180:
+            message = f"{message[:177]}..."
+        return f"{exc.__class__.__name__}: {message}"
+
     def _setup_environment(self) -> None:
         if settings.google_application_credentials:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.google_application_credentials
-        if settings.google_genai_use_vertexai:
+        if self._use_vertex_ai():
             if settings.google_cloud_project:
                 os.environ["GOOGLE_CLOUD_PROJECT"] = settings.google_cloud_project
             os.environ["GOOGLE_CLOUD_LOCATION"] = settings.google_cloud_location
             os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
             self._configured = True
-        elif settings.gemini_api_key and settings.gemini_api_key != "your-gemini-api-key":
+        elif self._has_api_key():
             self._configured = True
 
     @property
     def client(self):
         if self._client is None and genai is not None:
             kwargs: dict[str, Any] = {}
-            if not settings.google_genai_use_vertexai:
+            if self._use_vertex_ai():
+                kwargs["http_options"] = HttpOptions(api_version="v1")
+            else:
                 kwargs["api_key"] = settings.gemini_api_key
-            kwargs["http_options"] = HttpOptions(api_version="v1")
             self._client = genai.Client(**kwargs)
         return self._client
 
@@ -114,13 +146,61 @@ class AIService:
         logs = [
             {"agent": "Planner Agent", "message": "Prepared a structured extraction task for the Gemini document agent."},
         ]
-        prompt = (
-            "Extract land intelligence fields from the uploaded document. "
-            "Return strict JSON with keys: owner_name, khasra_no, village, district, area, "
-            "coordinates, document_date, chunks. "
-            "coordinates must be null or a JSON object. chunks must be an array of concise cited excerpts. "
-            f"Filename: {filename}\n\nDocument:\n{raw_text[:18000]}"
-        )
+        prompt = f"""
+Extract structured land/property information from the uploaded document.
+
+The document may contain:
+- table rows
+- cadastral records
+- ownership records
+- GIS coordinates
+- land intelligence metadata
+
+Return ONLY valid JSON in this exact structure:
+
+{{
+    "owner_name": "",
+    "khasra_no": "",
+    "village": "",
+    "district": "",
+    "state": "",
+    "area": null,
+    "coordinates": {{
+        "latitude": null,
+        "longitude": null
+    }},
+    "document_date": null,
+    "risk_level": "",
+    "risk_score": null,
+    "chunks": []
+}}
+
+Extraction Rules:
+- Extract values directly from table rows.
+- "Owner Name" -> owner_name
+- "Khasra Number" -> khasra_no
+- "Village" -> village
+- "District" -> district
+- "Land Area" -> area
+- "Latitude" -> coordinates.latitude
+- "Longitude" -> coordinates.longitude
+- "Risk Level" -> risk_level
+- "AI Risk Score" -> risk_score
+
+Important:
+- Never return "unknown" if value exists in document.
+- Preserve exact khasra format like 209/8 or 118/A.
+- area must be numeric only.
+- risk_score must be integer only.
+- coordinates must be valid JSON object.
+- chunks should contain short cited excerpts from document.
+
+Filename:
+{filename}
+
+Document:
+{raw_text[:18000]}
+"""
         system_instruction = (
             "You are GeoMind AI's Document Agent. Extract only what is supported by the document. "
             "Use ISO date format YYYY-MM-DD when date is available."
@@ -230,7 +310,7 @@ class AIService:
             logs.append({"agent": "Chat Agent", "message": "Gemini produced a grounded conversational GIS answer."})
             return (response.text or "").strip(), logs
         except Exception as exc:
-            logs.append({"agent": "Chat Agent", "message": f"Gemini chat unavailable, returned a deterministic fallback answer: {exc.__class__.__name__}."})
+            logs.append({"agent": "Chat Agent", "message": f"Gemini chat unavailable, returned a deterministic fallback answer. Reason: {self._describe_exception(exc)}."})
             answer = "GeoMind AI could not produce a live Gemini response."
             if report_payload and "why" in question.lower() and "risk" in question.lower():
                 answer = (
@@ -269,34 +349,42 @@ class AIService:
             f"Citations: {json.dumps(citations)}"
         )
         system_instruction = "You are GeoMind AI's streaming chat agent. Stay grounded in the provided GIS and land records context."
-        if not self.available():
-            def fallback_stream() -> Iterable[str]:
-                yield "Gemini streaming is not configured. "
-                if property_payload:
-                    yield f"Khasra {property_payload.get('khasra_no') or 'unknown'} "
-                    yield f"is associated with {property_payload.get('owner_name') or 'unknown owner'}."
 
-            logs.append({"agent": "Chat Agent", "message": "Gemini streaming unavailable, emitted a fallback streamed answer."})
+        def fallback_stream() -> Iterable[str]:
+            yield "Gemini streaming is unavailable. "
+            if property_payload:
+                yield f"Khasra {property_payload.get('khasra_no') or 'unknown'} "
+                yield f"is associated with {property_payload.get('owner_name') or 'unknown owner'}."
+
+        try:
+            if not self.available():
+                raise RuntimeError("Gemini service not configured")
+
+            stream = self.client.models.generate_content_stream(
+                model=settings.gemini_model,
+                contents=prompt,
+                config=GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.3,
+                    candidate_count=1,
+                ),
+            )
+
+            def iterator() -> Iterable[str]:
+                try:
+                    for chunk in stream:
+                        text = getattr(chunk, "text", None)
+                        if text:
+                            yield text
+                except Exception as exc:
+                    yield f"\n[Streaming fallback: {self._describe_exception(exc)}]\n"
+                    yield from fallback_stream()
+
+            logs.append({"agent": "Chat Agent", "message": "Gemini streaming response started successfully."})
+            return iterator(), logs
+        except Exception as exc:
+            logs.append({"agent": "Chat Agent", "message": f"Gemini streaming unavailable, emitted a fallback streamed answer. Reason: {self._describe_exception(exc)}."})
             return fallback_stream(), logs
-
-        stream = self.client.models.generate_content_stream(
-            model=settings.gemini_model,
-            contents=prompt,
-            config=GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.3,
-                candidate_count=1,
-            ),
-        )
-
-        def iterator() -> Iterable[str]:
-            for chunk in stream:
-                text = getattr(chunk, "text", None)
-                if text:
-                    yield text
-
-        logs.append({"agent": "Chat Agent", "message": "Gemini streaming response started successfully."})
-        return iterator(), logs
 
 
 ai_service = AIService()

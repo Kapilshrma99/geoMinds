@@ -117,6 +117,9 @@ def chat(payload: ChatRequest, current_user: User = Depends(get_current_user), d
 
 @router.post("/chat/stream")
 def stream_chat(payload: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    user_id = current_user.id
+    question = payload.question
+    property_id = payload.property_id
     extracted = db.get(ExtractedPropertyData, payload.property_id) if payload.property_id else None
     report = None
     conflicts: list[ConflictReport] = []
@@ -154,20 +157,26 @@ def stream_chat(payload: ChatRequest, current_user: User = Depends(get_current_u
             agent_name=item["agent"],
             message=item["message"],
             run_type="chat_stream",
-            user_id=current_user.id,
-            property_data_id=payload.property_id,
+            user_id=user_id,
+            property_data_id=property_id,
         )
         for item in log_entries
     ]
     persist_agent_logs(db, logs)
+    public_logs = public_agent_logs(logs)
 
     def event_stream():
         full_answer = ""
-        yield f"data: {json.dumps({'type': 'meta', 'citations': citations, 'agent_log': public_agent_logs(logs)})}\n\n"
-        for chunk in stream:
-            full_answer += chunk
-            yield f"data: {json.dumps({'type': 'chunk', 'delta': chunk})}\n\n"
-        db.add(ChatHistory(user_id=current_user.id, question=payload.question, answer=full_answer, citations=citations))
+        yield f"data: {json.dumps({'type': 'meta', 'citations': citations, 'agent_log': public_logs})}\n\n"
+        try:
+            for chunk in stream:
+                full_answer += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'delta': chunk})}\n\n"
+        except Exception as exc:
+            message = f"Streaming response interrupted: {exc.__class__.__name__}"
+            full_answer += message
+            yield f"data: {json.dumps({'type': 'chunk', 'delta': message})}\n\n"
+        db.add(ChatHistory(user_id=user_id, question=question, answer=full_answer, citations=citations))
         db.commit()
         yield f"data: {json.dumps({'type': 'done', 'answer': full_answer, 'citations': citations})}\n\n"
 
