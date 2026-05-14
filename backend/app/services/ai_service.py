@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.services.document_ai import infer_property_fields
+from app.services.token_logger import estimate_text_tokens, extract_usage_metadata, serialize_usage_metadata, write_token_log
 
 try:
     from google import genai
@@ -98,6 +99,55 @@ class AIService:
         )
         text = (response.text or "").strip()
         return json.loads(text)
+
+    def _log_usage(
+        self,
+        *,
+        operation: str,
+        model: str,
+        prompt: str,
+        response_text: str | None,
+        metadata: dict[str, Any] | None = None,
+        usage_metadata: Any = None,
+        status: str = "success",
+    ) -> None:
+        usage = extract_usage_metadata(usage_metadata)
+        if usage is None:
+            prompt_tokens = estimate_text_tokens(prompt)
+            response_tokens = estimate_text_tokens(response_text)
+            total_tokens = prompt_tokens + response_tokens
+            token_source = "estimated"
+        else:
+            prompt_tokens = usage["prompt_tokens"]
+            response_tokens = usage["response_tokens"]
+            cached_tokens = usage.get("cached_tokens", 0)
+            thoughts_tokens = usage.get("thoughts_tokens", 0)
+            tool_use_prompt_tokens = usage.get("tool_use_prompt_tokens", 0)
+            total_tokens = usage["total_tokens"]
+            token_source = "provider"
+        if usage is None:
+            cached_tokens = 0
+            thoughts_tokens = 0
+            tool_use_prompt_tokens = 0
+
+        write_token_log(
+            {
+                "operation": operation,
+                "model": model,
+                "status": status,
+                "token_source": token_source,
+                "prompt_tokens": prompt_tokens,
+                "response_tokens": response_tokens,
+                "cached_tokens": cached_tokens,
+                "thoughts_tokens": thoughts_tokens,
+                "tool_use_prompt_tokens": tool_use_prompt_tokens,
+                "total_tokens": total_tokens,
+                "prompt_characters": len(prompt or ""),
+                "response_characters": len(response_text or ""),
+                "usage_metadata": serialize_usage_metadata(usage_metadata),
+                "metadata": metadata or {},
+            }
+        )
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:
@@ -205,8 +255,20 @@ Document:
             "You are GeoMind AI's Document Agent. Extract only what is supported by the document. "
             "Use ISO date format YYYY-MM-DD when date is available."
         )
+        full_prompt = f"{system_instruction}\n\n{prompt}"
         try:
-            result = self._generate_json(model=settings.gemini_model, prompt=prompt, system_instruction=system_instruction)
+            response = self.client.models.generate_content(
+                model=settings.gemini_model,
+                contents=prompt,
+                config=GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=settings.gemini_temperature,
+                    candidate_count=1,
+                    response_mime_type="application/json",
+                ),
+            )
+            text = (response.text or "").strip()
+            result = json.loads(text)
             result["area"] = float(result["area"]) if result.get("area") not in (None, "") else None
             if result.get("document_date"):
                 try:
@@ -214,9 +276,34 @@ Document:
                 except ValueError:
                     result["document_date"] = fallback.get("document_date")
             result["chunks"] = (result.get("chunks") or fallback["chunks"] or [])[:8]
+            self._log_usage(
+                operation="file_extraction",
+                model=settings.gemini_model,
+                prompt=full_prompt,
+                response_text=text,
+                usage_metadata=getattr(response, "usage_metadata", None),
+                metadata={
+                    "filename": filename,
+                    "document_characters": len(raw_text),
+                    "chunk_count": len(result.get("chunks") or []),
+                },
+            )
             logs.append({"agent": "Document Agent", "message": "Gemini extracted structured ownership and cadastral fields from the uploaded document."})
             return result, logs
         except Exception as exc:
+            self._log_usage(
+                operation="file_extraction",
+                model=settings.gemini_model,
+                prompt=full_prompt,
+                response_text=json.dumps(fallback, default=str),
+                status="fallback",
+                metadata={
+                    "filename": filename,
+                    "document_characters": len(raw_text),
+                    "reason": self._describe_exception(exc),
+                    "fallback": True,
+                },
+            )
             logs.append({"agent": "Document Agent", "message": f"Gemini extraction unavailable, fell back to deterministic parser: {exc.__class__.__name__}."})
             return fallback, logs
 
@@ -311,6 +398,7 @@ Document:
             "Do not sound generic or conversationally vague. "
             "Do not invent parcel ids, owners, or disputes."
         )
+        full_prompt = f"{system_instruction}\n\n{prompt}"
         try:
             if not self.available():
                 raise RuntimeError("Gemini service not configured")
@@ -323,8 +411,23 @@ Document:
                     candidate_count=1,
                 ),
             )
+            answer = (response.text or "").strip()
+            self._log_usage(
+                operation="chat",
+                model=settings.gemini_model,
+                prompt=full_prompt,
+                response_text=answer,
+                usage_metadata=getattr(response, "usage_metadata", None),
+                metadata={
+                    "question": question,
+                    "property_id": property_payload.get("id") if property_payload else None,
+                    "citation_count": len(citations),
+                    "retrieved_context_count": len(retrieved_context),
+                    "parcel_context_count": len(parcel_context),
+                },
+            )
             logs.append({"agent": "Chat Agent", "message": "Gemini produced a grounded conversational GIS answer."})
-            return (response.text or "").strip(), logs
+            return answer, logs
         except Exception as exc:
             logs.append({"agent": "Chat Agent", "message": f"Gemini chat unavailable, returned a deterministic fallback answer. Reason: {self._describe_exception(exc)}."})
             answer = "GeoMind AI could not produce a live Gemini response."
@@ -340,6 +443,19 @@ Document:
                     f"{property_payload.get('owner_name') or 'unknown owner'} in "
                     f"{property_payload.get('village') or 'unknown village'}, {property_payload.get('district') or 'unknown district'}."
                 )
+            self._log_usage(
+                operation="chat",
+                model=settings.gemini_model,
+                prompt=full_prompt,
+                response_text=answer,
+                status="fallback",
+                metadata={
+                    "question": question,
+                    "property_id": property_payload.get("id") if property_payload else None,
+                    "reason": self._describe_exception(exc),
+                    "citation_count": len(citations),
+                },
+            )
             return answer, logs
 
     def stream_gis_query(
@@ -365,6 +481,7 @@ Document:
             f"Citations: {json.dumps(citations)}"
         )
         system_instruction = "You are GeoMind AI's streaming chat agent. Stay grounded in the provided GIS and land records context."
+        full_prompt = f"{system_instruction}\n\n{prompt}"
 
         def fallback_stream() -> Iterable[str]:
             yield "Gemini streaming is unavailable. "
@@ -387,20 +504,74 @@ Document:
             )
 
             def iterator() -> Iterable[str]:
+                response_parts: list[str] = []
+                final_usage = None
                 try:
                     for chunk in stream:
+                        final_usage = getattr(chunk, "usage_metadata", None) or final_usage
                         text = getattr(chunk, "text", None)
                         if text:
+                            response_parts.append(text)
                             yield text
                 except Exception as exc:
-                    yield f"\n[Streaming fallback: {self._describe_exception(exc)}]\n"
-                    yield from fallback_stream()
+                    fallback_chunks = [f"\n[Streaming fallback: {self._describe_exception(exc)}]\n"]
+                    fallback_chunks.extend(list(fallback_stream()))
+                    for item in fallback_chunks:
+                        response_parts.append(item)
+                        yield item
+                    self._log_usage(
+                        operation="chat_stream",
+                        model=settings.gemini_model,
+                        prompt=full_prompt,
+                        response_text="".join(response_parts),
+                        status="partial_fallback",
+                        usage_metadata=final_usage,
+                        metadata={
+                            "question": question,
+                            "property_id": property_payload.get("id") if property_payload else None,
+                            "citation_count": len(citations),
+                            "reason": self._describe_exception(exc),
+                        },
+                    )
+                    return
+                self._log_usage(
+                    operation="chat_stream",
+                    model=settings.gemini_model,
+                    prompt=full_prompt,
+                    response_text="".join(response_parts),
+                    usage_metadata=final_usage,
+                    metadata={
+                        "question": question,
+                        "property_id": property_payload.get("id") if property_payload else None,
+                        "citation_count": len(citations),
+                        "retrieved_context_count": len(retrieved_context),
+                        "parcel_context_count": len(parcel_context),
+                    },
+                )
 
             logs.append({"agent": "Chat Agent", "message": "Gemini streaming response started successfully."})
             return iterator(), logs
         except Exception as exc:
             logs.append({"agent": "Chat Agent", "message": f"Gemini streaming unavailable, emitted a fallback streamed answer. Reason: {self._describe_exception(exc)}."})
-            return fallback_stream(), logs
+            fallback_text = "".join(list(fallback_stream()))
+            self._log_usage(
+                operation="chat_stream",
+                model=settings.gemini_model,
+                prompt=full_prompt,
+                response_text=fallback_text,
+                status="fallback",
+                metadata={
+                    "question": question,
+                    "property_id": property_payload.get("id") if property_payload else None,
+                    "reason": self._describe_exception(exc),
+                    "citation_count": len(citations),
+                },
+            )
+
+            def fallback_iterator() -> Iterable[str]:
+                yield fallback_text
+
+            return fallback_iterator(), logs
 
 
 ai_service = AIService()

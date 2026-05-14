@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     geoserver_admin_password: str = "geoserver"
     vector_backend: str = "pgvector"
     upload_dir: str = "/app/uploads"
+    token_log_path: str = "/app/logs/token_usage.log"
 
 
 settings = Settings()

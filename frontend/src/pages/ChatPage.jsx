@@ -1,7 +1,8 @@
-import { Mic, MicOff, SearchCheck, Sparkles } from "lucide-react";
+import { Compass, Mic, MicOff, SearchCheck, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AgentTimeline } from "../components/AgentTimeline";
+import { MapPanel } from "../components/MapPanel";
 import { SectionCard } from "../components/SectionCard";
 import { api, streamChat } from "../lib/api";
 import { useAuth } from "../state/AuthContext";
@@ -22,13 +23,48 @@ export function ChatPage() {
   const [reports, setReports] = useState([]);
   const [propertyId, setPropertyId] = useState(1);
   const [listening, setListening] = useState(false);
+  const [parcels, setParcels] = useState([]);
+  const [match, setMatch] = useState(null);
+  const [geoserverLayers, setGeoserverLayers] = useState(null);
 
   useEffect(() => {
-    api.get("/reports").then((res) => {
-      setReports(res.data);
-      if (res.data[0]?.property_data_id) setPropertyId(res.data[0].property_data_id);
-    });
+    const load = async () => {
+      const [reportsRes, parcelsRes, geoserverRes] = await Promise.all([
+        api.get("/reports"),
+        api.get("/gis/parcels"),
+        api.get("/gis/geoserver/layers").catch(() => ({ data: null })),
+      ]);
+      setReports(reportsRes.data);
+      setParcels(parcelsRes.data);
+      setGeoserverLayers(geoserverRes.data);
+      if (reportsRes.data[0]?.property_data_id) setPropertyId(reportsRes.data[0].property_data_id);
+    };
+    load();
   }, []);
+
+  useEffect(() => {
+    if (!propertyId) {
+      setMatch(null);
+      return;
+    }
+
+    let active = true;
+
+    const loadMatch = async () => {
+      try {
+        const { data } = await api.post(`/gis/match-property?property_id=${propertyId}`);
+        if (active) setMatch(data);
+      } catch {
+        if (active) setMatch(null);
+      }
+    };
+
+    loadMatch();
+
+    return () => {
+      active = false;
+    };
+  }, [propertyId]);
 
   const ask = async (text = question) => {
     setLoading(true);
@@ -70,6 +106,18 @@ export function ChatPage() {
   };
 
   const selectedReport = useMemo(() => reports.find((report) => String(report.property_data_id) === String(propertyId)), [reports, propertyId]);
+  const selectedParcel = useMemo(() => {
+    if (!match?.parcel_id) return null;
+    return parcels.find((parcel) => String(parcel.id) === String(match.parcel_id)) || null;
+  }, [match, parcels]);
+  const selectedPropertyCoordinates = selectedReport?.report_json?.property_summary?.coordinates || null;
+  const mapContextParcels = useMemo(() => {
+    if (!selectedParcel) return parcels.slice(0, 8);
+    return parcels.filter((parcel) => parcel.id !== selectedParcel.id && parcel.village === selectedParcel.village).slice(0, 12);
+  }, [parcels, selectedParcel]);
+  const nearbyParcels = useMemo(() => {
+    return mapContextParcels.slice(0, 4);
+  }, [mapContextParcels]);
 
   const toggleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -165,9 +213,51 @@ export function ChatPage() {
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Reasoning Trace" subtitle="Planner, retrieval, and chat agent activity for every answer">
-        <AgentTimeline items={response?.agent_log || []} />
-      </SectionCard>
+      <div className="space-y-6">
+        <SectionCard title="Property Map" subtitle="See the selected property on the map along with nearby parcels for quick spatial context">
+          <MapPanel
+            parcels={mapContextParcels}
+            selectedPoint={selectedPropertyCoordinates}
+            selectedPointLabel={`Property ${propertyId}`}
+            height="420px"
+            geoserverLayerUrl={geoserverLayers?.wms}
+          />
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-fog">
+                <Compass size={12} />
+                Selected property
+              </div>
+              <div className="mt-3 space-y-2 text-sm text-slate-200">
+                <div>Khasra: {selectedReport?.report_json?.property_summary?.khasra_no || selectedParcel?.khasra_no || "Not matched yet"}</div>
+                <div>Owner: {selectedReport?.report_json?.property_summary?.owner_name || selectedParcel?.owner_name || "Unavailable"}</div>
+                <div>Village: {selectedReport?.report_json?.property_summary?.village || selectedParcel?.village || "Unavailable"}</div>
+                <div>Area: {selectedReport?.report_json?.property_summary?.area || selectedParcel?.area || "Unavailable"}</div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
+              <div className="text-[11px] uppercase tracking-[0.28em] text-fog">Nearby properties</div>
+              <div className="mt-3 space-y-2">
+                {nearbyParcels.length ? (
+                  nearbyParcels.map((parcel) => (
+                    <div key={parcel.id} className="rounded-2xl border border-white/10 bg-storm/80 px-3 py-2 text-sm text-slate-200">
+                      {parcel.khasra_no} | {parcel.owner_name} | {parcel.risk_hint || "Unknown risk"}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-slate-400">No nearby properties available for this selection yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Reasoning Trace" subtitle="Planner, retrieval, and chat agent activity for every answer">
+          <AgentTimeline items={response?.agent_log || []} />
+        </SectionCard>
+      </div>
     </div>
   );
 }

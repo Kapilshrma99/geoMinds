@@ -10,14 +10,23 @@ function toLeafletPolygon(geojson) {
   return geojson.coordinates[0][0].map(([lng, lat]) => [lat, lng]);
 }
 
+function toLeafletPoint(coordinates) {
+  if (!coordinates || typeof coordinates !== "object") return null;
+  const latitude = Number(coordinates.latitude ?? coordinates.lat);
+  const longitude = Number(coordinates.longitude ?? coordinates.lng ?? coordinates.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return [latitude, longitude];
+}
+
 function riskColor(risk) {
   if (String(risk).toLowerCase() === "high") return "#ff6f7d";
   if (String(risk).toLowerCase() === "medium") return "#ffbf69";
   return "#67f7c4";
 }
 
-function getBoundsForParcels(parcels) {
+function getBoundsForParcels(parcels, selectedPoint = null) {
   const points = parcels.flatMap((parcel) => toLeafletPolygon(parcel.geojson));
+  if (selectedPoint) points.push(selectedPoint);
   if (!points.length) return null;
   let minLat = points[0][0];
   let maxLat = points[0][0];
@@ -40,16 +49,16 @@ function normalizeWmsUrl(url) {
   return url.split("?")[0];
 }
 
-function ParcelViewport({ parcels, selectedParcel }) {
+function ParcelViewport({ parcels, selectedParcel, selectedPoint }) {
   const map = useMap();
 
   useEffect(() => {
     const focusParcels = selectedParcel ? [selectedParcel] : parcels.slice(0, Math.min(parcels.length, 8));
-    const bounds = getBoundsForParcels(focusParcels);
+    const bounds = getBoundsForParcels(focusParcels, selectedPoint);
     if (bounds) {
       map.flyToBounds(bounds, { padding: [48, 48], duration: 1.4 });
     }
-  }, [map, parcels, selectedParcel]);
+  }, [map, parcels, selectedParcel, selectedPoint]);
 
   return null;
 }
@@ -57,11 +66,14 @@ function ParcelViewport({ parcels, selectedParcel }) {
 export function MapPanel({
   parcels = [],
   selectedParcelId = null,
+  selectedPoint = null,
+  selectedPointLabel = "Selected property",
   height = "520px",
   geoserverLayerUrl = null,
   showGeoServerLayer = true,
 }) {
   const selectedParcel = parcels.find((parcel) => String(parcel.id) === String(selectedParcelId)) || null;
+  const leafletPoint = useMemo(() => toLeafletPoint(selectedPoint), [selectedPoint]);
   const nearbyParcels = useMemo(() => (selectedParcel ? parcels.filter((parcel) => parcel.id !== selectedParcel.id).slice(0, 4) : parcels.slice(0, 4)), [parcels, selectedParcel]);
 
   return (
@@ -73,7 +85,7 @@ export function MapPanel({
           GeoMind Parcel Theatre
         </div>
         <div className="mt-2 text-sm text-slate-200">
-          {selectedParcel ? `Tracking khasra ${selectedParcel.khasra_no}` : `${parcels.length} parcels in live intelligence view`}
+          {leafletPoint ? selectedPointLabel : selectedParcel ? `Tracking khasra ${selectedParcel.khasra_no}` : `${parcels.length} parcels in live intelligence view`}
         </div>
       </div>
 
@@ -106,7 +118,7 @@ export function MapPanel({
       </div>
 
       <MapContainer center={[26.8467, 80.9462]} zoom={11} style={{ height, width: "100%" }} zoomControl={false}>
-        <ParcelViewport parcels={parcels} selectedParcel={selectedParcel} />
+        <ParcelViewport parcels={parcels} selectedParcel={selectedParcel} selectedPoint={leafletPoint} />
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Dark Intelligence">
             <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="OpenStreetMap, CARTO" />
@@ -167,7 +179,13 @@ export function MapPanel({
           );
         })}
 
-        {selectedParcel ? (
+        {leafletPoint ? (
+          <CircleMarker center={leafletPoint} radius={9} pathOptions={{ color: "#67f7c4", fillColor: "#67f7c4", fillOpacity: 1 }}>
+            <Tooltip permanent direction="right">
+              {selectedPointLabel}
+            </Tooltip>
+          </CircleMarker>
+        ) : selectedParcel ? (
           <CircleMarker center={toLeafletPolygon(selectedParcel.geojson)[0]} radius={7} pathOptions={{ color: "#67f7c4", fillColor: "#67f7c4", fillOpacity: 1 }}>
             <Tooltip permanent direction="right">
               Active parcel
