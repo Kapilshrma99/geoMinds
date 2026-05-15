@@ -1,6 +1,7 @@
 import { Database, Shield, UploadCloud } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { MapPanel } from "../components/MapPanel";
 import { SectionCard } from "../components/SectionCard";
 import { api } from "../lib/api";
 import { useAuth } from "../state/AuthContext";
@@ -15,6 +16,8 @@ export function AdminPage() {
   const [layerForm, setLayerForm] = useState({ name: "", description: "", defaultDistrict: "", file: null });
   const [uploading, setUploading] = useState(false);
   const [savingRules, setSavingRules] = useState(false);
+  const [selectedLayerId, setSelectedLayerId] = useState(null);
+  const [layerParcels, setLayerParcels] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -32,6 +35,18 @@ export function AdminPage() {
   useEffect(() => {
     loadAdminData().catch((err) => setError(err.response?.data?.detail || "Unable to load admin controls"));
   }, []);
+
+  useEffect(() => {
+    if (!selectedLayerId) {
+      setLayerParcels([]);
+      return;
+    }
+
+    api
+      .get(`/gis/parcels?layer_id=${selectedLayerId}`)
+      .then((res) => setLayerParcels(res.data))
+      .catch((err) => setError(err.response?.data?.detail || "Unable to load selected layer parcels"));
+  }, [selectedLayerId]);
 
   const handleLayerUpload = async () => {
     if (!layerForm.name || !layerForm.file) {
@@ -52,6 +67,7 @@ export function AdminPage() {
       setMessage(`Imported ${data.imported_parcels} parcels into layer "${data.layer.name}". User uploads can now be analyzed against it.`);
       setLayerForm({ name: "", description: "", defaultDistrict: "", file: null });
       await loadAdminData();
+      setSelectedLayerId(data.layer.id);
     } catch (err) {
       setError(err.response?.data?.detail || "Layer import failed");
     } finally {
@@ -151,7 +167,13 @@ export function AdminPage() {
           <div className="space-y-3">
             {layers.length ? (
               layers.map((layer) => (
-                <div key={layer.id} className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
+                <button
+                  key={layer.id}
+                  onClick={() => setSelectedLayerId(layer.id)}
+                  className={`block w-full rounded-[1.6rem] border p-4 text-left transition ${
+                    selectedLayerId === layer.id ? "border-mint/30 bg-mint/10 shadow-glow" : "border-white/10 bg-white/5 hover:bg-white/[0.07]"
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-medium text-haze">{layer.name}</div>
@@ -160,7 +182,7 @@ export function AdminPage() {
                     <div className="rounded-full border border-mint/20 bg-mint/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-mint">{layer.feature_count} parcels</div>
                   </div>
                   <div className="mt-3 text-xs uppercase tracking-[0.2em] text-fog">Source file: {layer.source_filename || "Unknown"}</div>
-                </div>
+                </button>
               ))
             ) : (
               <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">No admin-imported reference layers yet. Seeded data is still available for analysis.</div>
@@ -168,6 +190,25 @@ export function AdminPage() {
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Layer Data View"
+        subtitle="Click an imported layer to see only that admin dataset on the map"
+      >
+        {selectedLayerId ? (
+          <div className="space-y-4">
+            <MapPanel parcels={layerParcels} height="520px" showGeoServerLayer={false} />
+            <div className="rounded-[1.6rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
+              Showing {layerParcels.length} parcels from layer{" "}
+              {layers.find((layer) => layer.id === selectedLayerId)?.name || `#${selectedLayerId}`}.
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+            Select a layer from the Imported Layers list to view only that admin-uploaded data.
+          </div>
+        )}
+      </SectionCard>
 
       <SectionCard title="Page Visibility Matrix" subtitle="Admin decides which role can open which page and component area">
         <div className="overflow-auto rounded-[1.8rem] border border-white/10 bg-white/5">

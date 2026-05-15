@@ -18,6 +18,7 @@ def get_parcels(
     village: str | None = None,
     district: str | None = None,
     risk: str | None = None,
+    layer_id: int | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -32,6 +33,9 @@ def get_parcels(
     if risk:
         conditions.append("risk_hint = :risk")
         params["risk"] = risk
+    if layer_id is not None:
+        conditions.append("layer_id = :layer_id")
+        params["layer_id"] = layer_id
 
     query = """
         SELECT id, khasra_no, owner_name, village, district, area, risk_hint, layer_id, ST_AsGeoJSON(geom) AS geojson
