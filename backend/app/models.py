@@ -20,6 +20,21 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class ReferenceLayer(Base):
+    __tablename__ = "reference_layers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    feature_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    uploader = relationship("User")
+
+
 class UploadedDocument(Base):
     __tablename__ = "uploaded_documents"
 
@@ -64,7 +79,10 @@ class LandParcel(Base):
     area: Mapped[float] = mapped_column(Float)
     geom: Mapped[str | None] = mapped_column(Geometry("MULTIPOLYGON", srid=4326), nullable=True)
     risk_hint: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    layer_id: Mapped[int | None] = mapped_column(ForeignKey("reference_layers.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    layer = relationship("ReferenceLayer")
 
 
 class PropertyMatch(Base):
@@ -127,6 +145,16 @@ class AgentExecutionLog(Base):
     status: Mapped[str] = mapped_column(String(30), default="completed")
     message: Mapped[str] = mapped_column(Text)
     log_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PageAccessRule(Base):
+    __tablename__ = "page_access_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_key: Mapped[str] = mapped_column(String(80), index=True)
+    role: Mapped[str] = mapped_column(String(30), index=True)
+    can_view: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

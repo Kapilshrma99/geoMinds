@@ -23,7 +23,8 @@ def summary(current_user: User = Depends(get_current_user), db: Session = Depend
               (SELECT COUNT(*) FROM uploaded_documents) AS total_uploaded_properties,
               (SELECT COUNT(*) FROM property_matches) AS total_matched_parcels,
               (SELECT COUNT(*) FROM conflict_reports WHERE severity IN ('high', 'medium')) AS conflict_count,
-              (SELECT COUNT(*) FROM ai_reports WHERE risk_level = 'High') AS high_risk_properties
+              (SELECT COUNT(*) FROM ai_reports WHERE risk_level = 'High') AS high_risk_properties,
+              (SELECT COUNT(*) FROM reference_layers WHERE is_active = true) AS active_reference_layers
             """
         )
     ).mappings().first()

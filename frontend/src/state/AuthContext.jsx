@@ -17,6 +17,33 @@ export function AuthProvider({ children }) {
     setAuthToken(token);
   }, [token]);
 
+  const refreshProfile = async () => {
+    if (!token) return null;
+    const { data } = await api.get("/auth/me");
+    setUser(data);
+    localStorage.setItem(`${storageKey}-user`, JSON.stringify(data));
+    return data;
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    if (user?.visible_pages?.length) return;
+
+    let active = true;
+    api
+      .get("/auth/me")
+      .then(({ data }) => {
+        if (!active) return;
+        setUser(data);
+        localStorage.setItem(`${storageKey}-user`, JSON.stringify(data));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [token, user]);
+
   const login = async (payload) => {
     setLoading(true);
     try {
@@ -53,7 +80,7 @@ export function AuthProvider({ children }) {
     setAuthToken(null);
   };
 
-  return <AuthContext.Provider value={{ token, user, loading, login, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ token, user, loading, login, register, logout, refreshProfile }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

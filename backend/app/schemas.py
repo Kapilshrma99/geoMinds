@@ -27,9 +27,43 @@ class UserOut(BaseModel):
     name: str
     email: EmailStr
     role: str
+    visible_pages: list[str] = []
 
     class Config:
         from_attributes = True
+
+
+class ReferenceLayerOut(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    source_filename: str | None
+    feature_count: int
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LayerImportResponse(BaseModel):
+    layer: ReferenceLayerOut
+    imported_parcels: int
+    analyzed_against: str
+
+
+class PageAccessRuleUpdate(BaseModel):
+    page_key: str
+    role: str
+    can_view: bool
+
+
+class PageAccessMatrixRow(BaseModel):
+    page_key: str
+    label: str
+    user: bool
+    analyst: bool
+    admin: bool
 
 
 class DocumentOut(BaseModel):

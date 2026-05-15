@@ -7,17 +7,19 @@ import { PageTransition } from "./PageTransition";
 import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
-  { to: "/dashboard", label: "Command Center", icon: LayoutDashboard },
-  { to: "/upload", label: "Mission Intake", icon: UploadCloud },
-  { to: "/map", label: "Parcel Theatre", icon: Map },
-  { to: "/chat", label: "Evidence Chat", icon: Bot },
-  { to: "/reports", label: "Intelligence Reports", icon: FileText },
-  { to: "/admin", label: "Governance", icon: Shield },
+  { to: "/dashboard", label: "Command Center", icon: LayoutDashboard, pageKey: "dashboard" },
+  { to: "/upload", label: "Mission Intake", icon: UploadCloud, pageKey: "upload" },
+  { to: "/map", label: "Parcel Theatre", icon: Map, pageKey: "map" },
+  { to: "/chat", label: "Evidence Chat", icon: Bot, pageKey: "chat" },
+  { to: "/reports", label: "Intelligence Reports", icon: FileText, pageKey: "reports" },
+  { to: "/admin", label: "Governance", icon: Shield, pageKey: "admin" },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const visiblePages = user?.visible_pages || [];
+  const allowedNavItems = navItems.filter((item) => visiblePages.includes(item.pageKey));
 
   return (
     <div className="min-h-screen bg-mesh text-haze">
@@ -40,7 +42,7 @@ export function AppShell() {
           </div>
 
           <nav className="mt-10 space-y-2">
-            {navItems.map(({ to, label, icon: Icon }) => (
+            {allowedNavItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

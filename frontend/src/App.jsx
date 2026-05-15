@@ -29,13 +29,13 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="upload" element={<UploadPage />} />
-        <Route path="map" element={<MapIntelligencePage />} />
-        <Route path="chat" element={<ChatPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="properties/:id" element={<PropertyDetailPage />} />
-        <Route path="admin" element={<AdminPage />} />
+        <Route path="dashboard" element={<ProtectedRoute pageKey="dashboard"><DashboardPage /></ProtectedRoute>} />
+        <Route path="upload" element={<ProtectedRoute pageKey="upload"><UploadPage /></ProtectedRoute>} />
+        <Route path="map" element={<ProtectedRoute pageKey="map"><MapIntelligencePage /></ProtectedRoute>} />
+        <Route path="chat" element={<ProtectedRoute pageKey="chat"><ChatPage /></ProtectedRoute>} />
+        <Route path="reports" element={<ProtectedRoute pageKey="reports"><ReportsPage /></ProtectedRoute>} />
+        <Route path="properties/:id" element={<ProtectedRoute pageKey="property-detail"><PropertyDetailPage /></ProtectedRoute>} />
+        <Route path="admin" element={<ProtectedRoute pageKey="admin"><AdminPage /></ProtectedRoute>} />
       </Route>
     </Routes>
   );

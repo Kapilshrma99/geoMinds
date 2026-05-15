@@ -34,7 +34,7 @@ def get_parcels(
         params["risk"] = risk
 
     query = """
-        SELECT id, khasra_no, owner_name, village, district, area, risk_hint, ST_AsGeoJSON(geom) AS geojson
+        SELECT id, khasra_no, owner_name, village, district, area, risk_hint, layer_id, ST_AsGeoJSON(geom) AS geojson
         FROM land_parcels
     """
     if conditions:
@@ -54,6 +54,7 @@ def get_parcels(
             "district": row["district"],
             "area": row["area"],
             "risk_hint": row["risk_hint"],
+            "layer_id": row["layer_id"],
             "geojson": json.loads(row["geojson"]) if row["geojson"] else None,
         }
         for row in rows
