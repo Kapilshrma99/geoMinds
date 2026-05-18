@@ -1,12 +1,12 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_document_access
 from app.models import UploadedDocument, User
 from app.schemas import DocumentOut
 
@@ -42,12 +42,13 @@ async def upload_document(
 
 @router.get("", response_model=list[DocumentOut])
 def list_documents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(UploadedDocument).order_by(UploadedDocument.created_at.desc()).all()
+    query = db.query(UploadedDocument)
+    if current_user.role != "admin":
+        query = query.filter(UploadedDocument.user_id == current_user.id)
+    return query.order_by(UploadedDocument.created_at.desc()).all()
 
 
 @router.get("/{document_id}")
 def get_document(document_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     doc = db.get(UploadedDocument, document_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    return require_document_access(current_user, doc)

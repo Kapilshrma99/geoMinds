@@ -1,12 +1,12 @@
 import json
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_document_access, require_property_access
 from app.models import AIReport, AgentExecutionLog, ChatHistory, ConflictReport, ExtractedPropertyData, PropertyMatch, UploadedDocument, User
 from app.schemas import AnalyzeResponse, ChatRequest, ChatResponse, ExtractedDataOut, ReportOut
 from app.services.agent_logs import create_agent_log, persist_agent_logs, public_agent_logs
@@ -45,8 +45,7 @@ def _serialize_extracted(extracted: ExtractedPropertyData | None) -> dict | None
 @router.post("/analyze-document/{document_id}", response_model=AnalyzeResponse)
 def analyze_document(document_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     doc = db.get(UploadedDocument, document_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+    doc = require_document_access(current_user, doc)
     context = geomind_orchestrator.analyze_document(db=db, user_id=current_user.id, document=doc)
     extracted = context.state["extracted"]
     match = context.state.get("match")
@@ -68,7 +67,7 @@ def chat(payload: ChatRequest, current_user: User = Depends(get_current_user), d
     report = None
     conflicts: list[ConflictReport] = []
     if payload.property_id:
-        extracted = db.get(ExtractedPropertyData, payload.property_id)
+        extracted = require_property_access(current_user, db.get(ExtractedPropertyData, payload.property_id), db)
         if extracted:
             report = (
                 db.query(AIReport)
@@ -120,7 +119,7 @@ def stream_chat(payload: ChatRequest, current_user: User = Depends(get_current_u
     user_id = current_user.id
     question = payload.question
     property_id = payload.property_id
-    extracted = db.get(ExtractedPropertyData, payload.property_id) if payload.property_id else None
+    extracted = require_property_access(current_user, db.get(ExtractedPropertyData, payload.property_id), db) if payload.property_id else None
     report = None
     conflicts: list[ConflictReport] = []
     if extracted:
@@ -185,9 +184,7 @@ def stream_chat(payload: ChatRequest, current_user: User = Depends(get_current_u
 
 @router.post("/generate-report/{property_id}", response_model=ReportOut)
 def generate_report(property_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    extracted = db.get(ExtractedPropertyData, property_id)
-    if not extracted:
-        raise HTTPException(status_code=404, detail="Property not found")
+    extracted = require_property_access(current_user, db.get(ExtractedPropertyData, property_id), db)
     match = db.query(PropertyMatch).filter(PropertyMatch.property_data_id == property_id).order_by(PropertyMatch.id.desc()).first()
     conflicts = db.query(ConflictReport).filter(ConflictReport.property_data_id == property_id).all()
     report = generate_risk_report(db, extracted, match, conflicts)
@@ -213,7 +210,37 @@ def agent_logs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if property_id is not None:
+        require_property_access(current_user, db.get(ExtractedPropertyData, property_id), db)
+    if document_id is not None:
+        require_document_access(current_user, db.get(UploadedDocument, document_id))
+
     query = db.query(AgentExecutionLog)
+    if current_user.role != "admin":
+        owned_property = (
+            db.query(ExtractedPropertyData.id)
+            .join(UploadedDocument, UploadedDocument.id == ExtractedPropertyData.document_id)
+            .filter(
+                ExtractedPropertyData.id == AgentExecutionLog.property_data_id,
+                UploadedDocument.user_id == current_user.id,
+            )
+            .correlate(AgentExecutionLog)
+            .exists()
+        )
+        owned_document = (
+            db.query(UploadedDocument.id)
+            .filter(
+                UploadedDocument.id == AgentExecutionLog.document_id,
+                UploadedDocument.user_id == current_user.id,
+            )
+            .correlate(AgentExecutionLog)
+            .exists()
+        )
+        query = query.filter(
+            (AgentExecutionLog.user_id == current_user.id)
+            | owned_property
+            | owned_document
+        )
     if property_id is not None:
         query = query.filter(AgentExecutionLog.property_data_id == property_id)
     if document_id is not None:

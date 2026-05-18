@@ -54,6 +54,7 @@ def persist_agent_log(db, entry: dict[str, str]) -> AgentExecutionLog:
     publish_execution_event(
         {
             "id": row.id,
+            "user_id": row.user_id,
             "agent": row.agent_name,
             "message": row.message,
             "status": row.status,

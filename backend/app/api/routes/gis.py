@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_property_access
 from app.models import ConflictReport, ExtractedPropertyData, LandParcel, PropertyMatch, User
 from app.services.geoserver import geoserver_layer_urls, publish_layer_payload
 from app.services.gis import parcel_to_geojson_row
@@ -81,15 +81,14 @@ def search_parcel(khasra: str = Query(""), current_user: User = Depends(get_curr
 
 @router.post("/match-property")
 def match_property(property_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    extracted = db.get(ExtractedPropertyData, property_id)
-    if not extracted:
-        raise HTTPException(status_code=404, detail="Property data not found")
+    extracted = require_property_access(current_user, db.get(ExtractedPropertyData, property_id), db)
     match = db.query(PropertyMatch).filter(PropertyMatch.property_data_id == extracted.id).order_by(PropertyMatch.id.desc()).first()
     return match
 
 
 @router.get("/conflicts/{property_id}")
 def get_conflicts(property_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_property_access(current_user, db.get(ExtractedPropertyData, property_id), db)
     return db.query(ConflictReport).filter(ConflictReport.property_data_id == property_id).all()
 
 
