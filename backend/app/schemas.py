@@ -77,6 +77,11 @@ class DocumentOut(BaseModel):
         from_attributes = True
 
 
+class DocumentBatchOut(BaseModel):
+    documents: list[DocumentOut]
+    uploaded_count: int
+
+
 class ExtractedDataOut(BaseModel):
     id: int
     document_id: int
@@ -142,6 +147,8 @@ class ReportOut(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     property_id: int | None = None
+    property_ids: list[int] | None = None
+    use_all_properties: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -157,6 +164,15 @@ class AnalyzeResponse(BaseModel):
     conflicts: list[ConflictOut]
     report: ReportOut
     agent_log: list[dict[str, Any]]
+
+
+class AnalyzeBatchRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1)
+
+
+class AnalyzeBatchResponse(BaseModel):
+    analyses: list[AnalyzeResponse]
+    analyzed_count: int
 
 
 class StreamEvent(BaseModel):

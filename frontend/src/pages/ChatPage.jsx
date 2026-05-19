@@ -15,6 +15,8 @@ const suggestions = [
   "Explain area mismatch",
 ];
 
+const LAST_BATCH_STORAGE_KEY = "geomind:last-upload-batch";
+
 export function ChatPage() {
   const { token } = useAuth();
   const [question, setQuestion] = useState(suggestions[0]);
@@ -22,6 +24,8 @@ export function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState([]);
   const [propertyId, setPropertyId] = useState(1);
+  const [scope, setScope] = useState("single");
+  const [latestBatch, setLatestBatch] = useState(null);
   const [listening, setListening] = useState(false);
   const [parcels, setParcels] = useState([]);
   const [match, setMatch] = useState(null);
@@ -38,6 +42,16 @@ export function ChatPage() {
       setParcels(parcelsRes.data);
       setGeoserverLayers(geoserverRes.data);
       if (reportsRes.data[0]?.property_data_id) setPropertyId(reportsRes.data[0].property_data_id);
+      if (typeof window !== "undefined") {
+        const stored = window.localStorage.getItem(LAST_BATCH_STORAGE_KEY);
+        if (stored) {
+          try {
+            setLatestBatch(JSON.parse(stored));
+          } catch {
+            setLatestBatch(null);
+          }
+        }
+      }
     };
     load();
   }, []);
@@ -69,10 +83,15 @@ export function ChatPage() {
   const ask = async (text = question) => {
     setLoading(true);
     setResponse({ answer: "", citations: [], agent_log: [] });
+    const payload =
+      scope === "all"
+        ? { question: text, use_all_properties: true }
+        : scope === "batch" && latestBatch?.propertyIds?.length
+          ? { question: text, property_ids: latestBatch.propertyIds }
+          : { question: text, property_id: propertyId };
     try {
       await streamChat({
-        question: text,
-        property_id: propertyId,
+        ...payload,
         token,
         onEvent: (event) => {
           if (event.type === "meta") {
@@ -98,7 +117,7 @@ export function ChatPage() {
         },
       });
     } catch {
-      const { data } = await api.post("/ai/chat", { question: text, property_id: propertyId });
+      const { data } = await api.post("/ai/chat", payload);
       setResponse(data);
     } finally {
       setLoading(false);
@@ -118,6 +137,13 @@ export function ChatPage() {
   const nearbyParcels = useMemo(() => {
     return mapContextParcels.slice(0, 4);
   }, [mapContextParcels]);
+  const scopeSummary = useMemo(() => {
+    if (scope === "all") return "All of your analyzed properties will be used as chat context.";
+    if (scope === "batch" && latestBatch?.propertyIds?.length) {
+      return `${latestBatch.propertyIds.length} properties from the latest upload batch are available for cross-document questions.`;
+    }
+    return selectedReport?.summary || "Choose a report to ground the conversation.";
+  }, [scope, latestBatch, selectedReport]);
 
   const toggleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -145,10 +171,18 @@ export function ChatPage() {
     <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
       <SectionCard title="Evidence Chat" subtitle="Conversational GIS reasoning grounded in document snippets, parcel context, and risk evidence">
         <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-4">
-          <div className="mb-4 grid gap-3 md:grid-cols-[0.75fr_1fr]">
+          <div className="mb-4 grid gap-3 md:grid-cols-[0.55fr_0.65fr_1fr]">
+            <label className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
+              <div className="mb-2 text-[11px] uppercase tracking-[0.28em] text-fog">Chat scope</div>
+              <select value={scope} onChange={(e) => setScope(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none">
+                <option value="single">Single property</option>
+                {latestBatch?.propertyIds?.length ? <option value="batch">Latest upload batch</option> : null}
+                <option value="all">All uploaded results</option>
+              </select>
+            </label>
             <label className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
               <div className="mb-2 text-[11px] uppercase tracking-[0.28em] text-fog">Property context</div>
-              <select value={propertyId} onChange={(e) => setPropertyId(Number(e.target.value))} className="w-full bg-transparent text-sm text-white outline-none">
+              <select value={propertyId} onChange={(e) => setPropertyId(Number(e.target.value))} disabled={scope !== "single"} className="w-full bg-transparent text-sm text-white outline-none disabled:opacity-50">
                 {reports.map((report) => (
                   <option key={report.id} value={report.property_data_id}>
                     Property {report.property_data_id} | Report {report.id} | {report.risk_level}
@@ -158,7 +192,7 @@ export function ChatPage() {
             </label>
             <div className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
               <div className="text-[11px] uppercase tracking-[0.28em] text-fog">Selected report summary</div>
-              <div className="mt-2 text-sm text-slate-200">{selectedReport?.summary || "Choose a report to ground the conversation."}</div>
+              <div className="mt-2 text-sm text-slate-200">{scopeSummary}</div>
             </div>
           </div>
 

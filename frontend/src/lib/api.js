@@ -14,14 +14,14 @@ export function setAuthToken(token) {
   }
 }
 
-export async function streamChat({ question, property_id, token, onEvent }) {
+export async function streamChat({ question, property_id, property_ids, use_all_properties = false, token, onEvent }) {
   const response = await fetch(`${baseURL}/ai/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ question, property_id }),
+    body: JSON.stringify({ question, property_id, property_ids, use_all_properties }),
   });
 
   if (!response.ok || !response.body) {

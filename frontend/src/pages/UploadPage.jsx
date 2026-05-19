@@ -16,10 +16,12 @@ const missionSteps = [
   { label: "Report Agent", detail: "Synthesizing the intelligence brief." },
 ];
 
+const LAST_BATCH_STORAGE_KEY = "geomind:last-upload-batch";
+
 export function UploadPage() {
   const { token } = useAuth();
-  const [file, setFile] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [analyses, setAnalyses] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [liveLogs, setLiveLogs] = useState([]);
@@ -48,20 +50,38 @@ export function UploadPage() {
     return () => controller.abort();
   }, [token, activeDocumentId]);
 
+  const rememberBatchForChat = (items) => {
+    if (typeof window === "undefined") return;
+    const propertyIds = items.map((item) => item.extracted_data?.id).filter(Boolean);
+    if (!propertyIds.length) return;
+    const payload = {
+      savedAt: new Date().toISOString(),
+      propertyIds,
+      filenames: items.map((item) => item.document.filename),
+    };
+    window.localStorage.setItem(LAST_BATCH_STORAGE_KEY, JSON.stringify(payload));
+  };
+
+  const toFileArray = (fileList) => Array.from(fileList || []).filter((entry) => entry instanceof File);
+
   const handleUpload = async () => {
-    if (!file) return;
+    if (!files.length) return;
     setUploading(true);
     setError("");
-    setAnalysis(null);
+    setAnalyses([]);
     setLiveLogs([]);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      const uploaded = await api.post("/documents/upload", formData);
-      setActiveDocumentId(uploaded.data.id);
-      const analyzed = await api.post(`/ai/analyze-document/${uploaded.data.id}`);
-      setAnalysis(analyzed.data);
-      setLiveLogs((current) => [...analyzed.data.agent_log, ...current].slice(0, 18));
+      files.forEach((file) => formData.append("files", file, file.webkitRelativePath || file.name));
+      const uploaded = await api.post("/documents/upload-batch", formData);
+      const documentIds = uploaded.data.documents.map((document) => document.id);
+      if (documentIds.length) {
+        setActiveDocumentId(documentIds[documentIds.length - 1]);
+      }
+      const analyzed = await api.post("/ai/analyze-batch", { document_ids: documentIds });
+      setAnalyses(analyzed.data.analyses);
+      rememberBatchForChat(analyzed.data.analyses);
+      setLiveLogs(analyzed.data.analyses.flatMap((item) => item.agent_log).slice(-18).reverse());
     } catch (err) {
       setError(err.response?.data?.detail || "Upload failed");
     } finally {
@@ -70,14 +90,21 @@ export function UploadPage() {
   };
 
   const progress = useMemo(() => {
-    if (analysis?.agent_log?.length) return 100;
+    if (analyses.length) return 100;
     return Math.max(...liveLogs.map((item) => Math.round((item.metadata?.progress || 0) * 100)), uploading ? 8 : 0);
-  }, [analysis, liveLogs, uploading]);
+  }, [analyses, liveLogs, uploading]);
 
-  const matchedParcelId = analysis?.match?.parcel_id;
+  const primaryAnalysis = analyses[0] || null;
+  const matchedParcelId = primaryAnalysis?.match?.parcel_id;
   const matchedParcel = parcels.find((parcel) => String(parcel.id) === String(matchedParcelId));
   const riskTone =
-    analysis?.report?.risk_level === "High" ? "text-red-200" : analysis?.report?.risk_level === "Medium" ? "text-amber-200" : "text-mint";
+    primaryAnalysis?.report?.risk_level === "High" ? "text-red-200" : primaryAnalysis?.report?.risk_level === "Medium" ? "text-amber-200" : "text-mint";
+  const summary = useMemo(() => {
+    const total = analyses.length;
+    const highRisk = analyses.filter((item) => item.report?.risk_level === "High").length;
+    const mediumRisk = analyses.filter((item) => item.report?.risk_level === "Medium").length;
+    return { total, highRisk, mediumRisk };
+  }, [analyses]);
 
   return (
     <div className="space-y-6">
@@ -90,10 +117,36 @@ export function UploadPage() {
               </div>
               <h3 className="mt-4 font-display text-2xl text-haze">Property PDF intake</h3>
               <p className="mt-3 text-sm leading-6 text-slate-300">
-                Upload title documents, khasra sheets, survey extracts, or legal ownership records. The system will parse, match, verify, and score them in sequence.
+                Upload one file, many files, or a whole folder of title documents, khasra sheets, survey extracts, and ownership records. GeoMind will analyze every file and make the batch available in chat.
               </p>
-              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="mx-auto mt-6 block max-w-full text-sm text-slate-300" />
-              <button onClick={handleUpload} disabled={!file || uploading} className="mt-6 rounded-2xl bg-mint px-5 py-3 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+              <div className="mt-6 grid gap-3 text-left md:grid-cols-2">
+                <label className="block text-sm text-slate-300">
+                  <span className="mb-2 block text-[11px] uppercase tracking-[0.28em] text-fog">Files</span>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => setFiles(toFileArray(e.target.files))}
+                    className="block w-full text-sm text-slate-300"
+                  />
+                </label>
+                <label className="block text-sm text-slate-300">
+                  <span className="mb-2 block text-[11px] uppercase tracking-[0.28em] text-fog">Folder</span>
+                  <input
+                    type="file"
+                    multiple
+                    webkitdirectory=""
+                    directory=""
+                    onChange={(e) => setFiles(toFileArray(e.target.files))}
+                    className="block w-full text-sm text-slate-300"
+                  />
+                </label>
+              </div>
+              {files.length ? (
+                <div className="mt-4 text-left text-sm text-slate-300">
+                  {files.length} file{files.length === 1 ? "" : "s"} queued
+                </div>
+              ) : null}
+              <button onClick={handleUpload} disabled={!files.length || uploading} className="mt-6 rounded-2xl bg-mint px-5 py-3 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
                 {uploading ? "Running autonomous analysis..." : "Upload and launch mission"}
               </button>
               {error ? <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
@@ -116,7 +169,9 @@ export function UploadPage() {
 
               <div className="mt-6 space-y-3">
                 {missionSteps.map((step) => {
-                  const completed = liveLogs.some((log) => log.agent === step.label && log.status !== "running") || analysis?.agent_log?.some((log) => log.agent === step.label && log.status !== "running");
+                  const completed =
+                    liveLogs.some((log) => log.agent === step.label && log.status !== "running") ||
+                    analyses.some((item) => item.agent_log?.some((log) => log.agent === step.label && log.status !== "running"));
                   const running = liveLogs.some((log) => log.agent === step.label && log.status === "running");
                   return (
                     <div key={step.label} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-storm/80 p-3">
@@ -136,11 +191,11 @@ export function UploadPage() {
         </SectionCard>
 
         <SectionCard title="Autonomous Execution" subtitle="Agents stream their work, timing, and operational progress in real time">
-          <AgentTimeline items={liveLogs.length ? liveLogs : analysis?.agent_log || []} />
+          <AgentTimeline items={liveLogs.length ? liveLogs : analyses.flatMap((item) => item.agent_log || [])} />
         </SectionCard>
       </div>
 
-      {analysis ? (
+      {analyses.length ? (
         <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
           <SectionCard title="Parcel Resolution" subtitle="The system zooms to the matched parcel and surrounding land context">
             <MapPanel
@@ -153,18 +208,29 @@ export function UploadPage() {
 
           <SectionCard title="Intelligence Snapshot" subtitle="Enterprise-style summary from the generated report">
             <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-5">
-              <div className="text-[11px] uppercase tracking-[0.34em] text-fog">Risk posture</div>
-              <div className={`mt-3 font-display text-5xl ${riskTone}`}>{analysis.report.risk_score}</div>
-              <div className="mt-1 text-sm text-slate-300">{analysis.report.risk_level} risk intelligence score</div>
-              <p className="mt-4 text-sm leading-7 text-slate-200">{analysis.report.summary}</p>
+              <div className="text-[11px] uppercase tracking-[0.34em] text-fog">Batch posture</div>
+              <div className="mt-3 font-display text-5xl text-haze">{summary.total}</div>
+              <div className="mt-1 text-sm text-slate-300">documents analyzed in this upload batch</div>
+              <p className="mt-4 text-sm leading-7 text-slate-200">
+                {summary.highRisk} high-risk and {summary.mediumRisk} medium-risk results are now available in Evidence Chat under the latest upload batch scope.
+              </p>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 grid gap-3">
+              {primaryAnalysis ? (
+                <div className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-fog">Primary file summary</div>
+                  <div className="mt-2 text-sm text-slate-200">
+                    <span className={riskTone}>{primaryAnalysis.report.risk_level}</span> risk | {primaryAnalysis.document.filename}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-300">{primaryAnalysis.report.summary}</div>
+                </div>
+              ) : null}
               {[
-                ["Owner", analysis.extracted_data.owner_name || "Not found"],
-                ["Khasra", analysis.extracted_data.khasra_no || "Not found"],
-                ["Village", analysis.extracted_data.village || "Not found"],
-                ["District", analysis.extracted_data.district || "Not found"],
+                ["Owner", primaryAnalysis?.extracted_data.owner_name || "Not found"],
+                ["Khasra", primaryAnalysis?.extracted_data.khasra_no || "Not found"],
+                ["Village", primaryAnalysis?.extracted_data.village || "Not found"],
+                ["District", primaryAnalysis?.extracted_data.district || "Not found"],
                 ["Matched Parcel", matchedParcel ? `${matchedParcel.khasra_no} (ID ${matchedParcel.id})` : "No reliable match"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
@@ -174,13 +240,29 @@ export function UploadPage() {
               ))}
             </div>
 
+            <div className="mt-4 space-y-3">
+              {analyses.map((item) => (
+                <div key={item.document.id} className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-haze">{item.document.filename}</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-fog">
+                      Property {item.extracted_data.id}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-slate-300">
+                    {item.extracted_data.owner_name || "Unknown owner"} | {item.extracted_data.khasra_no || "No khasra"} | {item.report.risk_level} risk
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <div className="mt-4 rounded-[1.6rem] border border-coral/15 bg-coral/10 p-4 text-sm text-slate-200">
               <div className="flex items-center gap-2 font-medium">
                 <ShieldAlert size={16} />
-                Demo talking point
+                Chat workflow
               </div>
               <p className="mt-2 leading-6">
-                After upload, pause on the live agent panel for two seconds, then shift attention to the parcel fly-to and score card. That transition sells the autonomy.
+                Open Evidence Chat and choose the latest upload batch scope to ask cross-document questions like ownership mismatches, repeated khasra numbers, or which uploaded file looks riskiest.
               </p>
             </div>
           </SectionCard>

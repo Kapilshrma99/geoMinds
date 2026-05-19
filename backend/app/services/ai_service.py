@@ -191,6 +191,32 @@ class AIService:
         magnitude = sum(value * value for value in vector) ** 0.5 or 1.0
         return [value / magnitude for value in vector]
 
+    @staticmethod
+    def _payload_ids(payload: Any) -> list[int]:
+        if payload is None:
+            return []
+        if isinstance(payload, list):
+            return [item.get("id") for item in payload if isinstance(item, dict) and item.get("id") is not None]
+        if isinstance(payload, dict) and payload.get("id") is not None:
+            return [payload["id"]]
+        return []
+
+    @staticmethod
+    def _fallback_property_summary(property_payload: Any) -> str | None:
+        if isinstance(property_payload, list):
+            if not property_payload:
+                return None
+            property_names = [item.get("khasra_no") or f"property {item.get('id')}" for item in property_payload[:3] if isinstance(item, dict)]
+            suffix = f" and {len(property_payload) - 3} more" if len(property_payload) > 3 else ""
+            return f"This batch includes {len(property_payload)} properties: {', '.join(property_names)}{suffix}."
+        if isinstance(property_payload, dict):
+            return (
+                f"Khasra {property_payload.get('khasra_no') or 'unknown'} belongs to "
+                f"{property_payload.get('owner_name') or 'unknown owner'} in "
+                f"{property_payload.get('village') or 'unknown village'}, {property_payload.get('district') or 'unknown district'}."
+            )
+        return None
+
     def extract_property_data(self, *, raw_text: str, filename: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
         fallback = infer_property_fields(raw_text, filename)
         logs = [
@@ -420,7 +446,7 @@ Document:
                 usage_metadata=getattr(response, "usage_metadata", None),
                 metadata={
                     "question": question,
-                    "property_id": property_payload.get("id") if property_payload else None,
+                    "property_ids": self._payload_ids(property_payload),
                     "citation_count": len(citations),
                     "retrieved_context_count": len(retrieved_context),
                     "parcel_context_count": len(parcel_context),
@@ -438,11 +464,7 @@ Document:
                     + "; ".join(report_payload.get("conflicts", [])[:3] if isinstance(report_payload.get("conflicts"), list) else [])
                 )
             elif property_payload:
-                answer = (
-                    f"Khasra {property_payload.get('khasra_no') or 'unknown'} belongs to "
-                    f"{property_payload.get('owner_name') or 'unknown owner'} in "
-                    f"{property_payload.get('village') or 'unknown village'}, {property_payload.get('district') or 'unknown district'}."
-                )
+                answer = self._fallback_property_summary(property_payload) or answer
             self._log_usage(
                 operation="chat",
                 model=settings.gemini_model,
@@ -451,7 +473,7 @@ Document:
                 status="fallback",
                 metadata={
                     "question": question,
-                    "property_id": property_payload.get("id") if property_payload else None,
+                    "property_ids": self._payload_ids(property_payload),
                     "reason": self._describe_exception(exc),
                     "citation_count": len(citations),
                 },
@@ -485,9 +507,9 @@ Document:
 
         def fallback_stream() -> Iterable[str]:
             yield "Gemini streaming is unavailable. "
-            if property_payload:
-                yield f"Khasra {property_payload.get('khasra_no') or 'unknown'} "
-                yield f"is associated with {property_payload.get('owner_name') or 'unknown owner'}."
+            fallback_summary = self._fallback_property_summary(property_payload)
+            if fallback_summary:
+                yield fallback_summary
 
         try:
             if not self.available():
@@ -528,7 +550,7 @@ Document:
                         usage_metadata=final_usage,
                         metadata={
                             "question": question,
-                            "property_id": property_payload.get("id") if property_payload else None,
+                            "property_ids": self._payload_ids(property_payload),
                             "citation_count": len(citations),
                             "reason": self._describe_exception(exc),
                         },
@@ -542,7 +564,7 @@ Document:
                     usage_metadata=final_usage,
                     metadata={
                         "question": question,
-                        "property_id": property_payload.get("id") if property_payload else None,
+                        "property_ids": self._payload_ids(property_payload),
                         "citation_count": len(citations),
                         "retrieved_context_count": len(retrieved_context),
                         "parcel_context_count": len(parcel_context),
@@ -562,7 +584,7 @@ Document:
                 status="fallback",
                 metadata={
                     "question": question,
-                    "property_id": property_payload.get("id") if property_payload else None,
+                    "property_ids": self._payload_ids(property_payload),
                     "reason": self._describe_exception(exc),
                     "citation_count": len(citations),
                 },

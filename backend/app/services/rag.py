@@ -58,6 +58,7 @@ def retrieve_relevant_chunks(
     *,
     question: str,
     property_data_id: int | None = None,
+    property_data_ids: list[int] | None = None,
     document_id: int | None = None,
     top_k: int = 4,
 ) -> list[DocumentChunk]:
@@ -66,6 +67,8 @@ def retrieve_relevant_chunks(
         stmt = select(DocumentChunk).where(DocumentChunk.embedding.is_not(None))
         if property_data_id is not None:
             stmt = stmt.where(DocumentChunk.property_data_id == property_data_id)
+        if property_data_ids:
+            stmt = stmt.where(DocumentChunk.property_data_id.in_(property_data_ids))
         if document_id is not None:
             stmt = stmt.where(DocumentChunk.document_id == document_id)
         stmt = stmt.order_by(DocumentChunk.embedding.cosine_distance(query_embedding)).limit(top_k)
@@ -74,6 +77,8 @@ def retrieve_relevant_chunks(
         stmt = select(DocumentChunk)
         if property_data_id is not None:
             stmt = stmt.where(DocumentChunk.property_data_id == property_data_id)
+        if property_data_ids:
+            stmt = stmt.where(DocumentChunk.property_data_id.in_(property_data_ids))
         if document_id is not None:
             stmt = stmt.where(DocumentChunk.document_id == document_id)
         stmt = stmt.limit(top_k)
