@@ -43,6 +43,14 @@ body {
   box-sizing: border-box;
 }
 
+[class*="rounded-"]:not(.keep-round) {
+  border-radius: 2px !important;
+}
+
+.keep-round {
+  border-radius: 9999px !important;
+}
+
 body::before {
   content: "";
   position: fixed;
@@ -96,6 +104,7 @@ body::after {
   color: #eef7ff;
   border: 1px solid rgba(103, 247, 196, 0.22);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
 }
 
 .leaflet-control-zoom a,
@@ -152,7 +161,7 @@ body::after {
 
 ::-webkit-scrollbar-thumb {
   background: rgba(88, 110, 138, 0.56);
-  border-radius: 999px;
+  border-radius: 2px;
 }
 
 @keyframes shimmer {

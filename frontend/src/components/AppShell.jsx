@@ -24,9 +24,9 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-mesh text-haze">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-[-8rem] top-0 h-72 w-72 rounded-full bg-mint/10 blur-3xl" />
-        <div className="absolute right-[-4rem] top-24 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl" />
-        <div className="absolute bottom-[-6rem] left-1/3 h-96 w-96 rounded-full bg-gold/10 blur-3xl" />
+        <div className="keep-round absolute left-[-8rem] top-0 h-72 w-72 rounded-full bg-mint/10 blur-3xl" />
+        <div className="keep-round absolute right-[-4rem] top-24 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl" />
+        <div className="keep-round absolute bottom-[-6rem] left-1/3 h-96 w-96 rounded-full bg-gold/10 blur-3xl" />
       </div>
       <div className="relative mx-auto flex min-h-screen max-w-[1680px] gap-6 p-4 lg:p-6">
         <aside className="glass-panel hidden w-[320px] shrink-0 rounded-[2rem] border border-white/10 p-6 shadow-panel lg:flex lg:flex-col">

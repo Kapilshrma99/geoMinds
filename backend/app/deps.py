@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.database import get_db
-from app.models import ExtractedPropertyData, UploadedDocument, User
+from app.models import AIReport, ExtractedPropertyData, UploadedDocument, User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -68,3 +68,16 @@ def require_property_access(
     if not can_access_property_data(current_user, property_data, db):
         raise HTTPException(status_code=404, detail="Property not found")
     return property_data
+
+
+def can_access_report(current_user: User, report: AIReport | None, db: Session) -> bool:
+    if report is None:
+        return False
+    property_data = db.get(ExtractedPropertyData, report.property_data_id)
+    return can_access_property_data(current_user, property_data, db)
+
+
+def require_report_access(current_user: User, report: AIReport | None, db: Session) -> AIReport:
+    if not can_access_report(current_user, report, db):
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report

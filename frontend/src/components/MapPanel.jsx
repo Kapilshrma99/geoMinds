@@ -96,7 +96,7 @@ export function MapPanel({
           ["High", "#ff6f7d"],
         ].map(([label, color]) => (
           <div key={label} className="rounded-full border border-white/10 bg-black/45 px-3 py-2 text-xs text-slate-100 backdrop-blur">
-            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+            <span className="keep-round mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
             {label}
           </div>
         ))}
