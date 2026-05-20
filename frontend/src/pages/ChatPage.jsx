@@ -1,5 +1,6 @@
 import { Compass, Mic, MicOff, SearchCheck, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { AgentTimeline } from "../components/AgentTimeline";
 import { MapPanel } from "../components/MapPanel";
@@ -18,6 +19,7 @@ const suggestions = [
 const LAST_BATCH_STORAGE_KEY = "geomind:last-upload-batch";
 
 export function ChatPage() {
+  const location = useLocation();
   const { token } = useAuth();
   const [question, setQuestion] = useState(suggestions[0]);
   const [response, setResponse] = useState(null);
@@ -30,6 +32,7 @@ export function ChatPage() {
   const [parcels, setParcels] = useState([]);
   const [match, setMatch] = useState(null);
   const [geoserverLayers, setGeoserverLayers] = useState(null);
+  const [incomingParcelContext, setIncomingParcelContext] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -55,6 +58,24 @@ export function ChatPage() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    const routeState = location.state;
+    if (!routeState) return;
+
+    if (routeState.question) {
+      setQuestion(routeState.question);
+    }
+    if (routeState.propertyId) {
+      setPropertyId(routeState.propertyId);
+      setScope("single");
+    }
+    if (routeState.parcelContext) {
+      setIncomingParcelContext(routeState.parcelContext);
+    } else {
+      setIncomingParcelContext(null);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (!propertyId) {
@@ -195,6 +216,12 @@ export function ChatPage() {
               <div className="mt-2 text-sm text-slate-200">{scopeSummary}</div>
             </div>
           </div>
+
+          {incomingParcelContext ? (
+            <div className="mb-4 rounded-[1.4rem] border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm text-slate-100">
+              Chat opened from Parcel Theatre for khasra {incomingParcelContext.khasra_no} in {incomingParcelContext.village}, {incomingParcelContext.district}.
+            </div>
+          ) : null}
 
           <textarea
             value={question}

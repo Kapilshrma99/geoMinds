@@ -1,11 +1,13 @@
-import { AlertTriangle, Filter, Layers3 } from "lucide-react";
+import { AlertTriangle, Filter, Layers3, MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { MapPanel } from "../components/MapPanel";
 import { SectionCard } from "../components/SectionCard";
 import { api } from "../lib/api";
 
 export function MapIntelligencePage() {
+  const navigate = useNavigate();
   const [parcels, setParcels] = useState([]);
   const [filters, setFilters] = useState({ khasra: "", village: "", district: "", risk: "" });
   const [selectedParcel, setSelectedParcel] = useState(null);
@@ -32,6 +34,28 @@ export function MapIntelligencePage() {
     if (!selectedParcel) return filtered.slice(0, 10);
     return filtered.filter((parcel) => parcel.id === selectedParcel.id || parcel.village === selectedParcel.village).slice(0, 12);
   }, [filtered, selectedParcel]);
+
+  const openChat = () => {
+    const parcelQuestion = selectedParcel
+      ? `Analyze parcel khasra ${selectedParcel.khasra_no} in ${selectedParcel.village}, ${selectedParcel.district}. Explain the risk and nearby context.`
+      : "Analyze the selected parcel and explain its risk signals.";
+    navigate("/chat", {
+      state: {
+        question: parcelQuestion,
+        parcelContext: selectedParcel
+          ? {
+              id: selectedParcel.id,
+              khasra_no: selectedParcel.khasra_no,
+              owner_name: selectedParcel.owner_name,
+              village: selectedParcel.village,
+              district: selectedParcel.district,
+              area: selectedParcel.area,
+              risk_hint: selectedParcel.risk_hint,
+            }
+          : null,
+      },
+    });
+  };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
@@ -61,6 +85,15 @@ export function MapIntelligencePage() {
               <option value="high">High</option>
             </select>
           </label>
+        </div>
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={openChat}
+            className="inline-flex items-center gap-2 rounded-2xl border border-mint/20 bg-mint/10 px-4 py-3 text-sm font-medium text-mint transition hover:bg-mint/20"
+          >
+            <MessageSquare size={16} />
+            Open in chat
+          </button>
         </div>
         <MapPanel parcels={selectedContext} selectedParcelId={selectedParcel?.id} height="640px" geoserverLayerUrl={geoserverLayers?.wms} />
       </SectionCard>
@@ -115,6 +148,13 @@ export function MapIntelligencePage() {
                   Use this panel while the map is focused on the selected parcel to narrate owner, area, and village context before moving into conflict evidence.
                 </p>
               </div>
+              <button
+                onClick={openChat}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[1.4rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition hover:bg-white/10"
+              >
+                <MessageSquare size={16} />
+                Ask about this parcel in chat
+              </button>
             </div>
           ) : (
             <div className="rounded-[1.6rem] border border-coral/20 bg-coral/10 p-4 text-sm text-slate-200">
