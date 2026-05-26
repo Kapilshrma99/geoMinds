@@ -29,6 +29,11 @@ function statusMeta(status) {
 export function AgentTimeline({ items = [] }) {
   return (
     <div className="space-y-3">
+      {items.length ? (
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+          Each row shows which agent is working, what it is doing, and whether that step is still running, completed, or failed.
+        </div>
+      ) : null}
       {items.map((item, index) => {
         const meta = statusMeta(item.status);
         const Icon = meta.icon;

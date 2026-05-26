@@ -131,8 +131,9 @@ export function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.65fr_0.95fr]">
         <SectionCard
-          title="GIS Theatre"
-          subtitle="Cinematic parcel visibility with live GeoServer overlay support"
+          title="Map Section"
+          subtitle="Parcel map with risk colors and GeoServer overlays"
+          helper="Use this area to see where the selected parcel is located, how risky it is, and what nearby parcels may affect it."
           right={
             <div className="rounded-full border border-mint/15 bg-mint/10 px-3 py-2 text-xs uppercase tracking-[0.2em] text-mint">
               Map intelligence online
@@ -147,6 +148,8 @@ export function DashboardPage() {
               selectedParcelId={selectedParcel?.id}
               height="520px"
               geoserverLayerUrl={geoserverLayers?.wms}
+              label="Parcel map"
+              helper="Highlighted parcel boundaries represent land records. Colors show risk level and optional overlays add reference data."
             />
           )}
           <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -163,15 +166,20 @@ export function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Agent Operations" subtitle="Live execution timeline across the autonomous analysis stack">
+        <SectionCard
+          title="Activity Section"
+          subtitle="Live agent timeline for the current system activity"
+          helper="Use this panel to understand which backend component is running now and what work it has already completed."
+        >
           {loading ? <Skeleton className="h-[700px] w-full rounded-[1.75rem]" /> : <AgentTimeline items={agentFeed} />}
         </SectionCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <SectionCard
-          title="Recent Intelligence Reports"
-          subtitle="Decision-ready summaries for the most recent analyses"
+          title="Reports Section"
+          subtitle="Recent analysis reports and risk summaries"
+          helper="Open any report here to review the latest findings for a property and move into its detailed page."
           right={
             <Link to="/reports" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">
               Open report library
@@ -195,7 +203,11 @@ export function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Judge Demo Arc" subtitle="A five-step story designed for clarity, drama, and trust">
+        <SectionCard
+          title="How To Use"
+          subtitle="A simple five-step flow for understanding the product"
+          helper="This section explains how the main components connect so a user can quickly learn where to upload, inspect, and ask questions."
+        >
           <div className="space-y-3">
             {[
               ["1", "Mission intake", "Upload the property PDF and show the scanner and parser awaken."],
@@ -227,7 +239,11 @@ export function DashboardPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Platform Value" subtitle="Why the system feels like enterprise software instead of a generic chatbot">
+      <SectionCard
+        title="Why This Matters"
+        subtitle="What each major capability adds to the workflow"
+        helper="Read this area as a quick explanation of the product’s core building blocks and why they are useful."
+      >
         <div className="grid gap-4 md:grid-cols-3">
           {[
             ["Evidence-grounded AI", "RAG citations, structured report output, and parcel context keep answers anchored in land records."],

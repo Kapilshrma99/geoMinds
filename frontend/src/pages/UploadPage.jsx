@@ -109,7 +109,11 @@ export function UploadPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <SectionCard title="Mission Intake" subtitle="Upload a land dossier and trigger the autonomous intelligence sequence">
+        <SectionCard
+          title="Upload Section"
+          subtitle="Upload land documents and start analysis"
+          helper="Choose files or a folder here, then launch the workflow. The right panel shows which processing step is currently active."
+        >
           <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="scanline rounded-[1.9rem] border border-dashed border-mint/30 bg-white/5 p-6 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-mint/20 bg-mint/10 text-mint">
@@ -190,23 +194,37 @@ export function UploadPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Autonomous Execution" subtitle="Agents stream their work, timing, and operational progress in real time">
+        <SectionCard
+          title="Processing Activity"
+          subtitle="Live timeline of document extraction and analysis"
+          helper="Follow this feed to see which agent is working and how far the current upload has progressed."
+        >
           <AgentTimeline items={liveLogs.length ? liveLogs : analyses.flatMap((item) => item.agent_log || [])} />
         </SectionCard>
       </div>
 
       {analyses.length ? (
         <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-          <SectionCard title="Parcel Resolution" subtitle="The system zooms to the matched parcel and surrounding land context">
+          <SectionCard
+            title="Matched Parcel"
+            subtitle="Map view of the parcel found for the uploaded document"
+            helper="This section helps the user confirm whether the uploaded record matched the expected parcel and surrounding area."
+          >
             <MapPanel
               parcels={matchedParcel ? parcels.filter((parcel) => parcel.id === matchedParcel.id || parcel.village === matchedParcel.village).slice(0, 8) : parcels.slice(0, 8)}
               selectedParcelId={matchedParcel?.id}
               height="500px"
               geoserverLayerUrl={geoserverLayers?.wms}
+              label="Matched parcel map"
+              helper="The active highlight shows the best parcel match found from the uploaded land document."
             />
           </SectionCard>
 
-          <SectionCard title="Intelligence Snapshot" subtitle="Enterprise-style summary from the generated report">
+          <SectionCard
+            title="Analysis Summary"
+            subtitle="Key extracted facts and report outcome"
+            helper="Use this panel to review the main result of the upload before moving into chat or the full reports page."
+          >
             <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-5">
               <div className="text-[11px] uppercase tracking-[0.34em] text-fog">Batch posture</div>
               <div className="mt-3 font-display text-5xl text-haze">{summary.total}</div>

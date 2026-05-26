@@ -7,19 +7,57 @@ import { PageTransition } from "./PageTransition";
 import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
-  { to: "/dashboard", label: "Command Center", icon: LayoutDashboard, pageKey: "dashboard" },
-  { to: "/upload", label: "Mission Intake", icon: UploadCloud, pageKey: "upload" },
-  { to: "/map", label: "Parcel Theatre", icon: Map, pageKey: "map" },
-  { to: "/chat", label: "Evidence Chat", icon: Bot, pageKey: "chat" },
-  { to: "/reports", label: "Intelligence Reports", icon: FileText, pageKey: "reports" },
-  { to: "/admin", label: "Governance", icon: Shield, pageKey: "admin" },
+  { to: "/dashboard", label: "Dashboard", helper: "See platform status and recent results", icon: LayoutDashboard, pageKey: "dashboard" },
+  { to: "/upload", label: "Upload Documents", helper: "Add land files and start analysis", icon: UploadCloud, pageKey: "upload" },
+  { to: "/map", label: "Map Intelligence", helper: "Inspect parcels, filters, and risk areas", icon: Map, pageKey: "map" },
+  { to: "/chat", label: "Evidence Chat", helper: "Ask grounded questions about reports", icon: Bot, pageKey: "chat" },
+  { to: "/reports", label: "Reports", helper: "Review generated risk summaries", icon: FileText, pageKey: "reports" },
+  { to: "/admin", label: "Admin", helper: "Manage layers and access rules", icon: Shield, pageKey: "admin" },
 ];
+
+const pageMeta = {
+  "/dashboard": {
+    eyebrow: "Overview",
+    title: "Dashboard",
+    description: "Track uploads, parcel risk, map activity, and agent progress from one place.",
+  },
+  "/upload": {
+    eyebrow: "Document Intake",
+    title: "Upload And Analyze",
+    description: "Add land records here to run extraction, parcel matching, and risk analysis.",
+  },
+  "/map": {
+    eyebrow: "Spatial Review",
+    title: "Map Intelligence",
+    description: "Use filters and parcel selection to understand where each land component fits on the map.",
+  },
+  "/chat": {
+    eyebrow: "Question Answering",
+    title: "Evidence Chat",
+    description: "Ask questions about one property, a batch, or all reports and see grounded evidence.",
+  },
+  "/reports": {
+    eyebrow: "Decision Output",
+    title: "Reports",
+    description: "Open the generated summaries, scores, recommendations, and exportable PDFs.",
+  },
+  "/admin": {
+    eyebrow: "System Control",
+    title: "Admin",
+    description: "Configure layer imports, inspect endpoints, and control page visibility by role.",
+  },
+};
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const visiblePages = user?.visible_pages || [];
   const allowedNavItems = navItems.filter((item) => visiblePages.includes(item.pageKey));
+  const headerMeta = pageMeta[location.pathname] || {
+    eyebrow: "Workspace",
+    title: "Land Intelligence Workspace",
+    description: "Use the sections below to inspect data, run analysis, and review output.",
+  };
 
   return (
     <div className="min-h-screen bg-mesh text-haze">
@@ -42,7 +80,7 @@ export function AppShell() {
           </div>
 
           <nav className="mt-10 space-y-2">
-            {allowedNavItems.map(({ to, label, icon: Icon }) => (
+            {allowedNavItems.map(({ to, label, helper, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -57,7 +95,10 @@ export function AppShell() {
                 <span className="rounded-xl border border-white/10 bg-white/5 p-2 text-mint">
                   <Icon size={16} />
                 </span>
-                <span>{label}</span>
+                <span>
+                  <span className="block text-white">{label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-400">{helper}</span>
+                </span>
               </NavLink>
             ))}
           </nav>
@@ -86,12 +127,13 @@ export function AppShell() {
           <header className="glass-panel mb-6 rounded-[2rem] border border-white/10 p-5 shadow-panel">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <div className="text-[11px] uppercase tracking-[0.34em] text-fog">Operational Workspace</div>
-                <div className="mt-2 font-display text-3xl font-semibold text-haze">
-                  {location.pathname === "/dashboard" ? "Command Center" : "Land Intelligence Workspace"}
-                </div>
+                <div className="text-[11px] uppercase tracking-[0.34em] text-fog">{headerMeta.eyebrow}</div>
+                <div className="mt-2 font-display text-3xl font-semibold text-haze">{headerMeta.title}</div>
                 <div className="mt-2 text-sm text-slate-300">
-                  {user?.name} is signed in with {user?.role} access and live parcel intelligence.
+                  {headerMeta.description}
+                </div>
+                <div className="mt-2 text-sm text-slate-400">
+                  {user?.name} is signed in with {user?.role} access.
                 </div>
               </motion.div>
 

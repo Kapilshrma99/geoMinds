@@ -11,6 +11,7 @@ export function StatCard({ title, value, hint, color = "from-mint/18 via-transpa
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)]" />
       <div className="relative">
+        <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Metric</div>
         <div className="text-[11px] uppercase tracking-[0.28em] text-fog">{title}</div>
         <div className="mt-3 font-display text-4xl font-semibold text-haze">{value}</div>
         <div className="mt-2 text-sm leading-6 text-slate-300">{hint}</div>

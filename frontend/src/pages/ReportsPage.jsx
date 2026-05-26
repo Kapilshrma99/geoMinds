@@ -18,7 +18,11 @@ export function ReportsPage() {
   }, []);
 
   return (
-    <SectionCard title="Report Library" subtitle="Enterprise-style property intelligence packages for download, presentation, and audit">
+    <SectionCard
+      title="Reports Library"
+      subtitle="Review generated property reports"
+      helper="Each report card summarizes one analyzed property, including the score, reasoning, recommendation, and export option."
+    >
       <div className="space-y-4">
         {reports.map((report) => (
           <div key={report.id} className="rounded-[1.9rem] border border-white/10 bg-white/5 p-5">

@@ -59,7 +59,11 @@ export function MapIntelligencePage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-      <SectionCard title="Parcel Theatre" subtitle="Risk-coded map operations with GeoServer overlay control and parcel fly-to">
+      <SectionCard
+        title="Map Viewer"
+        subtitle="Search, filter, and inspect parcels on the map"
+        helper="The filters narrow the parcel list, the queue chooses the active parcel, and the map shows where that parcel sits with nearby context."
+      >
         <div className="mb-4 grid gap-3 md:grid-cols-4">
           <label className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
             <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-fog">
@@ -95,11 +99,22 @@ export function MapIntelligencePage() {
             Open in chat
           </button>
         </div>
-        <MapPanel parcels={selectedContext} selectedParcelId={selectedParcel?.id} height="640px" geoserverLayerUrl={geoserverLayers?.wms} />
+        <MapPanel
+          parcels={selectedContext}
+          selectedParcelId={selectedParcel?.id}
+          height="640px"
+          geoserverLayerUrl={geoserverLayers?.wms}
+          label="Parcel map viewer"
+          helper="Pick a parcel from the queue to center the map, highlight its shape, and compare nearby parcels."
+        />
       </SectionCard>
 
       <div className="space-y-6">
-        <SectionCard title="Parcel Queue" subtitle="Select a parcel to inspect spatial and ownership signals">
+        <SectionCard
+          title="Parcel List"
+          subtitle="Choose the parcel you want to inspect"
+          helper="Each row represents one parcel result. Selecting a row updates the map and the parcel details panel."
+        >
           <div className="space-y-3">
             {filtered.map((parcel) => (
               <button
@@ -124,7 +139,11 @@ export function MapIntelligencePage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Analyst Overlay" subtitle="A compact parcel intelligence readout for narration">
+        <SectionCard
+          title="Parcel Details"
+          subtitle="Key facts for the selected parcel"
+          helper="This panel summarizes the currently selected parcel so the user can quickly understand who owns it, where it is, and what to ask next."
+        >
           {selectedParcel ? (
             <div className="space-y-3">
               {[

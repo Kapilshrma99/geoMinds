@@ -190,7 +190,11 @@ export function ChatPage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-      <SectionCard title="Evidence Chat" subtitle="Conversational GIS reasoning grounded in document snippets, parcel context, and risk evidence">
+      <SectionCard
+        title="Question Panel"
+        subtitle="Ask grounded questions about properties and reports"
+        helper="Choose the scope, pick a property if needed, type your question, and review the answer with evidence citations below."
+      >
         <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-4">
           <div className="mb-4 grid gap-3 md:grid-cols-[0.55fr_0.65fr_1fr]">
             <label className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3">
@@ -275,13 +279,19 @@ export function ChatPage() {
       </SectionCard>
 
       <div className="space-y-6">
-        <SectionCard title="Property Map" subtitle="See the selected property on the map along with nearby parcels for quick spatial context">
+        <SectionCard
+          title="Map Context"
+          subtitle="See the selected property and nearby parcels"
+          helper="This map helps the user connect the chat answer back to parcel location, ownership, and nearby risk context."
+        >
           <MapPanel
             parcels={mapContextParcels}
             selectedPoint={selectedPropertyCoordinates}
             selectedPointLabel={`Property ${propertyId}`}
             height="420px"
             geoserverLayerUrl={geoserverLayers?.wms}
+            label="Chat map context"
+            helper="The marker shows the selected property and surrounding parcels provide extra spatial context for the answer."
           />
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -315,7 +325,11 @@ export function ChatPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Reasoning Trace" subtitle="Planner, retrieval, and chat agent activity for every answer">
+        <SectionCard
+          title="Answer Trace"
+          subtitle="Step-by-step agent activity behind the response"
+          helper="Use this timeline to understand how the system prepared the final answer and which components were involved."
+        >
           <AgentTimeline items={response?.agent_log || []} />
         </SectionCard>
       </div>

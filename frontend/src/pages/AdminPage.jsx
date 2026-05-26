@@ -114,7 +114,11 @@ export function AdminPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-2">
-        <SectionCard title="Admin Control Plane" subtitle="Upload backend reference layers and govern who can see each workflow">
+        <SectionCard
+          title="Admin Overview"
+          subtitle="System status for layers, roles, and GeoServer"
+          helper="This panel gives admins a quick summary of the backend mapping setup and current role context."
+        >
           <div className="space-y-3 text-sm text-slate-700 dark:text-slate-200">
             <div>User Role: {user?.role}</div>
             <div>GeoServer Layer Publication: {geoServer?.status || "Loading..."}</div>
@@ -126,13 +130,21 @@ export function AdminPage() {
           {error ? <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
         </SectionCard>
 
-        <SectionCard title="Layer URLs" subtitle="Use these endpoints to connect WMS/WFS layers into external GIS tools">
+        <SectionCard
+          title="Layer Endpoints"
+          subtitle="GeoServer connection details"
+          helper="Use these URLs when you need to plug the system’s published layers into external GIS tools."
+        >
           <pre className="overflow-auto rounded-[1.75rem] bg-slate-950 p-5 text-sm text-green-300">{JSON.stringify(geoServer, null, 2)}</pre>
         </SectionCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
-        <SectionCard title="Reference Layer Import" subtitle="Admin uploads parcel JSON or GeoJSON so user uploads can be analyzed against preloaded backend data">
+        <SectionCard
+          title="Import Layer"
+          subtitle="Upload a parcel dataset for reference analysis"
+          helper="Admins use this form to add a new backend parcel layer that user uploads can be matched against."
+        >
           <div className="grid gap-4">
             <label className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
               <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-fog">
@@ -163,7 +175,11 @@ export function AdminPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Imported Layers" subtitle="These datasets become part of the backend parcel reference pool used during user analysis">
+        <SectionCard
+          title="Available Layers"
+          subtitle="Reference datasets already loaded into the system"
+          helper="Select a layer here to inspect what data it contains and preview only that dataset on the map."
+        >
           <div className="space-y-3">
             {layers.length ? (
               layers.map((layer) => (
@@ -192,12 +208,19 @@ export function AdminPage() {
       </div>
 
       <SectionCard
-        title="Layer Data View"
-        subtitle="Click an imported layer to see only that admin dataset on the map"
+        title="Layer Preview"
+        subtitle="Map view for the selected imported layer"
+        helper="This preview isolates one admin-uploaded dataset so you can verify the imported parcel geometry before using it."
       >
         {selectedLayerId ? (
           <div className="space-y-4">
-            <MapPanel parcels={layerParcels} height="520px" showGeoServerLayer={false} />
+            <MapPanel
+              parcels={layerParcels}
+              height="520px"
+              showGeoServerLayer={false}
+              label="Imported layer preview"
+              helper="This map only shows parcels from the selected admin layer."
+            />
             <div className="rounded-[1.6rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
               Showing {layerParcels.length} parcels from layer{" "}
               {layers.find((layer) => layer.id === selectedLayerId)?.name || `#${selectedLayerId}`}.
@@ -210,7 +233,11 @@ export function AdminPage() {
         )}
       </SectionCard>
 
-      <SectionCard title="Page Visibility Matrix" subtitle="Admin decides which role can open which page and component area">
+      <SectionCard
+        title="Access Rules"
+        subtitle="Control which roles can open each page"
+        helper="Toggle visibility for each role, then save to update what users can access after they sign in."
+      >
         <div className="overflow-auto rounded-[1.8rem] border border-white/10 bg-white/5">
           <table className="min-w-full text-left text-sm text-slate-200">
             <thead className="border-b border-white/10 text-[11px] uppercase tracking-[0.26em] text-fog">

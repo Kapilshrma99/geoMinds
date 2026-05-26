@@ -71,6 +71,8 @@ export function MapPanel({
   height = "520px",
   geoserverLayerUrl = null,
   showGeoServerLayer = true,
+  label = "Parcel Map",
+  helper = "Use the highlighted shapes and overlays to understand parcel position and risk.",
 }) {
   const selectedParcel = parcels.find((parcel) => String(parcel.id) === String(selectedParcelId)) || null;
   const leafletPoint = useMemo(() => toLeafletPoint(selectedPoint), [selectedPoint]);
@@ -82,11 +84,12 @@ export function MapPanel({
       <div className="pointer-events-none absolute left-4 top-4 z-[402] rounded-2xl border border-white/10 bg-black/45 px-4 py-3 backdrop-blur">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.34em] text-mint">
           <Radar size={12} />
-          GeoMind Parcel Theatre
+          {label}
         </div>
         <div className="mt-2 text-sm text-slate-200">
           {leafletPoint ? selectedPointLabel : selectedParcel ? `Tracking khasra ${selectedParcel.khasra_no}` : `${parcels.length} parcels in live intelligence view`}
         </div>
+        <div className="mt-2 max-w-sm text-xs leading-5 text-slate-400">{helper}</div>
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pointer-events-none absolute bottom-4 left-4 z-[402] flex flex-wrap gap-2">
