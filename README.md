@@ -1,163 +1,157 @@
 # GeoMind AI
 
-GeoMind AI is a hackathon-ready full-stack land intelligence platform for uploading property records, extracting land metadata with AI-style agents, matching that data against GIS parcels, detecting ownership and boundary conflicts, visualizing risk on a map, and generating downloadable reports.
+GeoMind AI is a hackathon-ready land intelligence platform built for the Google Cloud Rapid Agent Hackathon. It combines FastAPI, React, PostGIS, GeoServer, Gemini/Vertex AI, and a MongoDB MCP-backed precedent store to analyze land documents, validate parcels, explain conflicts, and generate risk reports.
 
-## Gemini + Vertex AI
+## Hackathon Positioning
 
-GeoMind AI now includes a centralized Gemini service layer with optional Vertex AI mode.
+- Built for the Google Cloud Rapid Agent Hackathon
+- Powered by Gemini and Vertex AI
+- Orchestrated as a Google Cloud Agent Builder workflow
+- Uses MongoDB MCP as the required partner integration
+- Uses PostgreSQL/PostGIS and GeoServer for GIS validation
+- Keeps the existing upload, extraction, conflict detection, report, chat, and auth flows intact
 
-- `backend/app/services/ai_service.py` is the single integration point for Gemini and Vertex AI.
-- Set `GOOGLE_GENAI_USE_VERTEXAI=true` to route requests through Vertex AI.
-- Set `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and optionally `GOOGLE_APPLICATION_CREDENTIALS` for Vertex AI authentication.
-- If `GOOGLE_GENAI_USE_VERTEXAI=false`, the backend uses the direct Gemini API key from `GEMINI_API_KEY`.
-- Streaming conversational responses are available on `POST /ai/chat/stream`.
-- Agent execution traces are persisted and available at `GET /ai/agent-logs`.
+## Judge-Friendly Demo Story
 
-### Backend AI capabilities
+GeoMind AI helps a user upload a land document and ask one simple question: has this property behaved like previous high-risk cases?
 
-- Gemini-powered structured document extraction
-- pgvector-backed document chunk indexing with Gemini embeddings
-- Gemini-powered risk and report generation
-- Conversational GIS querying grounded in parcel context
-- Streaming chat responses for the frontend
-- Persistent agent execution logs
+Demo flow:
 
-## What’s Included
-
-- React + Tailwind frontend with:
-  - Login and registration
-  - Executive dashboard
-  - Document upload and analysis flow
-  - Interactive Leaflet parcel map
-  - AI chat workspace
-  - Reports and property detail pages
-  - Admin panel with GeoServer layer metadata
-- FastAPI backend with:
-  - JWT auth and role support
-  - Document upload APIs
-  - Property extraction pipeline
-  - GIS parcel matching and conflict detection
-  - Risk analysis and PDF report generation
-  - GeoServer URL publishing helpers
-- PostgreSQL/PostGIS schema and seed parcels
-- Docker Compose for frontend, backend, database, pgAdmin, and GeoServer
-- Demo sample file in [demo/sample-land-record.txt](/c:/docker-workspace/geomaind/demo/sample-land-record.txt)
+1. The user uploads a land document.
+2. GeoMind extracts owner, khasra, village, district, area, and cited evidence.
+3. GeoMind matches the document to a PostGIS parcel.
+4. GeoMind detects ownership, overlap, boundary, and area conflicts.
+5. GeoMind stores the document metadata, extracted entities, risk report, and agent summary in MongoDB MCP memory.
+6. The user clicks `Compare with Previous High-Risk Records`.
+7. GeoMind fetches similar high-risk cases from MongoDB MCP.
+8. Gemini compares the current property against those precedent cases and explains the matching reasons, risk posture, and recommendation.
 
 ## Architecture
 
-### AI Agent Flow
+### Google Cloud Agent Builder orchestration
 
-1. `Planner Agent` decides the analysis path.
-2. `Document Agent` extracts owner, khasra number, village, district, area, date, and document chunks.
-3. `GIS Agent` matches document entities with `land_parcels`.
-4. `Conflict Agent` checks:
-   - duplicate khasra numbers
-   - ownership mismatches
-   - area differences
-   - parcel intersections via `ST_Intersects`
-5. `Risk Agent` assigns a risk score and severity.
-6. `Report Agent` creates a structured report and downloadable PDF.
-7. `Chat Agent` answers follow-up questions with document citations.
+The backend is structured so FastAPI exposes tool-like actions that Google Cloud Agent Builder can orchestrate:
 
-### Core Stack
+- `extract_document_entities`
+- `match_gis_parcel`
+- `detect_conflicts`
+- `fetch_mongodb_context`
+- `generate_risk_report`
+- `generate_pdf_report`
 
-- Frontend: React, Tailwind CSS, Leaflet, Axios, React Router, Framer Motion
-- Backend: FastAPI, SQLAlchemy, PostGIS, GeoAlchemy2, ReportLab
-- AI/RAG layer: Gemini embeddings, pgvector retrieval, document chunking
-- GIS: PostGIS + GeoServer-ready WMS/WFS integration helpers
+These tool wrappers live in [backend/app/services/agent_builder_tools.py](/c:/docker-workspace/geomaind/backend/app/services/agent_builder_tools.py).
 
-## Project Structure
+### Core pipeline
 
-```text
-geomaind/
-├── backend/
-│   ├── app/
-│   │   ├── api/routes/
-│   │   ├── core/
-│   │   ├── db/
-│   │   └── services/
-│   ├── sql/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── src/components/
-│   ├── src/pages/
-│   ├── src/state/
-│   └── Dockerfile
-├── demo/
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+1. `Planner Agent` defines the workflow.
+2. `Document Agent` extracts structured land entities from the uploaded file.
+3. `GIS Agent` validates the document against `land_parcels` in PostGIS.
+4. `Conflict Agent` detects duplicate khasra, ownership mismatch, overlap, missing parcel, and area anomalies.
+5. `Risk Agent` computes baseline risk signals.
+6. `Report Agent` uses Gemini to generate a risk report and PDF.
+7. `MongoDB MCP` stores prior cases and returns precedent context for comparison.
 
-## Database Schema
+### Stack
 
-Tables included in the backend model layer:
+- Frontend: React, Tailwind, Leaflet, Axios
+- Backend: FastAPI, SQLAlchemy, ReportLab
+- AI: Gemini / Vertex AI via `google-genai`
+- GIS: PostgreSQL, PostGIS, GeoServer WMS/WFS helpers
+- Agent memory and partner integration: MongoDB MCP
+- Retrieval: pgvector document chunks
 
-- `users`
-- `uploaded_documents`
-- `extracted_property_data`
-- `land_parcels`
-- `property_matches`
-- `conflict_reports`
-- `ai_reports`
-- `chat_history`
-- `document_chunks`
+## New Hackathon Feature
 
-`document_chunks` stores chunk text, citation labels, and pgvector embeddings for semantic retrieval during chat and downstream analysis.
+### Compare With Previous High-Risk Records
 
-`land_parcels` includes parcel geometry and is seeded with:
+Visible in the property detail page.
 
-- duplicate/conflicting khasra records
-- clean records
-- medium-risk records
-- overlapping parcel polygons
+What it shows:
 
-## API Endpoints
+- Similar high-risk records from MongoDB MCP
+- Matching reasons such as village, district, owner, or khasra overlap
+- Gemini risk explanation
+- Final recommendation
 
-### Auth
+Backend endpoints:
+
+- `POST /mcp/sync-document/{document_id}`
+- `GET /mcp/high-risk-records`
+- `POST /mcp/compare-property/{property_id}`
+
+If MongoDB MCP is not configured, GeoMind falls back safely and the rest of the platform still works.
+
+## Existing Product Capabilities
+
+- Document upload
+- AI extraction pipeline
+- GIS parcel matching
+- Conflict detection
+- Risk scoring
+- PDF report generation
+- AI chat
+- Agent logs
+- pgvector document chunks
+- PostGIS `land_parcels`
+- GeoServer WMS/WFS helpers
+
+## Key Files
+
+- [backend/app/services/agent_builder_tools.py](/c:/docker-workspace/geomaind/backend/app/services/agent_builder_tools.py)
+- [backend/app/services/mongodb_mcp.py](/c:/docker-workspace/geomaind/backend/app/services/mongodb_mcp.py)
+- [backend/app/services/orchestration.py](/c:/docker-workspace/geomaind/backend/app/services/orchestration.py)
+- [backend/app/services/ai_service.py](/c:/docker-workspace/geomaind/backend/app/services/ai_service.py)
+- [backend/app/api/routes/mcp.py](/c:/docker-workspace/geomaind/backend/app/api/routes/mcp.py)
+- [frontend/src/pages/PropertyDetailPage.jsx](/c:/docker-workspace/geomaind/frontend/src/pages/PropertyDetailPage.jsx)
+
+## API Summary
+
+Auth:
 
 - `POST /auth/register`
 - `POST /auth/login`
 - `GET /auth/me`
 
-### Dashboard
-
-- `GET /dashboard/summary`
-
-### Documents
+Documents and analysis:
 
 - `POST /documents/upload`
+- `POST /documents/upload-batch`
 - `GET /documents`
-- `GET /documents/{id}`
-
-### AI
-
 - `POST /ai/analyze-document/{document_id}`
-- `POST /ai/chat`
-- `POST /ai/chat/stream`
+- `POST /ai/analyze-batch`
 - `POST /ai/generate-report/{property_id}`
-- `GET /ai/agent-logs`
 
-### GIS
+GIS and reports:
 
 - `GET /gis/parcels`
-- `GET /gis/parcels/{id}`
-- `GET /gis/search?khasra=`
 - `POST /gis/match-property?property_id=`
 - `GET /gis/conflicts/{property_id}`
-- `GET /gis/geoserver/publish`
-- `GET /gis/geoserver/layers`
-
-### Reports
-
 - `GET /reports`
-- `GET /reports/{id}`
-- `GET /reports/{id}/download`
+- `GET /reports/{report_id}/download`
+
+MongoDB MCP:
+
+- `POST /mcp/sync-document/{document_id}`
+- `GET /mcp/high-risk-records`
+- `POST /mcp/compare-property/{property_id}`
+
+## Environment Variables
+
+Important variables for the hackathon build:
+
+- `MONGODB_URI`
+- `MONGODB_DATABASE`
+- `MONGODB_MCP_ENABLED=true`
+- `GOOGLE_GENAI_USE_VERTEXAI=true`
+- `GOOGLE_CLOUD_PROJECT`
+- `GOOGLE_CLOUD_LOCATION`
+- `GEMINI_API_KEY`
+
+See [.env.example](/c:/docker-workspace/geomaind/.env.example) for the full list.
 
 ## Local Run
 
-1. Copy `.env.example` values if you want to customize environment settings.
+1. Configure `.env` values.
 2. Start the stack:
 
 ```bash
@@ -165,21 +159,11 @@ docker compose up --build
 ```
 
 3. Open:
-   - Frontend: `http://localhost:5173`
-   - Backend docs: `http://localhost:8000/docs`
-   - pgAdmin: `http://localhost:5050`
-   - GeoServer: `http://localhost:8084`
 
-4. pgAdmin login:
-   - Email: `admin@geomind.ai` or `PGADMIN_DEFAULT_EMAIL`
-   - Password: `admin123` or `PGADMIN_DEFAULT_PASSWORD`
-
-5. To register the GeoMind database inside pgAdmin, use:
-   - Host: `db`
-   - Port: `5432`
-   - Database: `geomind`
-   - Username: `geomind`
-   - Password: `geomind`
+- Frontend: `http://localhost:5173`
+- Backend docs: `http://localhost:8000/docs`
+- pgAdmin: `http://localhost:5050`
+- GeoServer: `http://localhost:8084`
 
 ## Demo Credentials
 
@@ -187,19 +171,12 @@ docker compose up --build
 - Analyst: `analyst@geomind.ai` / `analyst123`
 - User: `user@geomind.ai` / `user123`
 
-## Hackathon Demo Flow
+## Demo Script
 
 1. Sign in as admin.
-2. Open `Upload Document`.
-3. Upload [demo/sample-land-record.txt](/c:/docker-workspace/geomaind/demo/sample-land-record.txt) or a PDF with similar fields.
-4. Let the agent pipeline run.
-5. Review the extracted land metadata and risk score.
-6. Open `Map Intelligence` to inspect highlighted parcels.
-7. Ask in `AI Chat`: `Why is this property high risk?`
-8. Open `Reports` and download the generated PDF.
-
-## Notes
-
-- The code is structured so Gemini, LangChain, or a richer RAG layer can be swapped in later.
-- The current extraction pipeline is heuristics-first for hackathon reliability and demo speed.
-- GeoServer integration is represented by publish metadata and WMS/WFS URLs so the frontend can consume those layers next.
+2. Upload [demo/sample-land-record.txt](/c:/docker-workspace/geomaind/demo/sample-land-record.txt).
+3. Run document analysis.
+4. Open the property detail page.
+5. Click `Compare with Previous High-Risk Records`.
+6. Show the matched MongoDB MCP cases, Gemini explanation, and recommendation.
+7. Download the PDF report to close the story.

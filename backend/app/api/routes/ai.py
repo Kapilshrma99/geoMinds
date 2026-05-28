@@ -9,9 +9,10 @@ from app.db.database import get_db
 from app.deps import get_current_user, require_document_access, require_property_access
 from app.models import AIReport, AgentExecutionLog, ChatHistory, ConflictReport, ExtractedPropertyData, PropertyMatch, UploadedDocument, User
 from app.schemas import AnalyzeBatchRequest, AnalyzeBatchResponse, AnalyzeResponse, ChatRequest, ChatResponse, ExtractedDataOut, ReportOut
+from app.services.agent_builder_tools import generate_risk_report
 from app.services.agent_logs import create_agent_log, persist_agent_logs, public_agent_logs
-from app.services.agents import generate_risk_report
 from app.services.ai_service import ai_service
+from app.services.mongodb_mcp import mongodb_mcp_service
 from app.services.orchestration import geomind_orchestrator
 from app.services.gis import conversational_gis_context
 from app.services.rag import retrieve_relevant_chunks, summarize_retrieved_chunks
@@ -110,9 +111,12 @@ def _build_chat_context(
 
 @router.post("/analyze-document/{document_id}", response_model=AnalyzeResponse)
 def analyze_document(document_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # FastAPI exposes this analysis action as a tool surface that Google Cloud
+    # Agent Builder can orchestrate in the hackathon demo.
     doc = db.get(UploadedDocument, document_id)
     doc = require_document_access(current_user, doc)
     context = geomind_orchestrator.analyze_document(db=db, user_id=current_user.id, document=doc)
+    mongodb_mcp_service.sync_document(db=db, document_id=doc.id)
     extracted = context.state["extracted"]
     match = context.state.get("match")
     conflicts = context.state.get("conflicts", [])
@@ -139,6 +143,7 @@ def analyze_batch(payload: AnalyzeBatchRequest, current_user: User = Depends(get
         doc = db.get(UploadedDocument, document_id)
         doc = require_document_access(current_user, doc)
         context = geomind_orchestrator.analyze_document(db=db, user_id=current_user.id, document=doc)
+        mongodb_mcp_service.sync_document(db=db, document_id=doc.id)
         extracted = context.state["extracted"]
         match = context.state.get("match")
         conflicts = context.state.get("conflicts", [])
@@ -247,6 +252,7 @@ def generate_report(property_id: int, current_user: User = Depends(get_current_u
     match = db.query(PropertyMatch).filter(PropertyMatch.property_data_id == property_id).order_by(PropertyMatch.id.desc()).first()
     conflicts = db.query(ConflictReport).filter(ConflictReport.property_data_id == property_id).all()
     report = generate_risk_report(db, extracted, match, conflicts)
+    mongodb_mcp_service.sync_document(db=db, document_id=extracted.document_id)
     logs = [
         create_agent_log(
             agent_name="Report Agent",

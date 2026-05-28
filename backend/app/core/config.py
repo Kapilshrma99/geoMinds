@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     google_cloud_location: str = "global"
     google_genai_use_vertexai: bool = False
     google_application_credentials: str | None = None
+    mongodb_uri: str | None = None
+    mongodb_database: str | None = None
+    mongodb_mcp_enabled: bool = True
     frontend_origin: str = "http://localhost:5173"
     geoserver_url: str = "http://geoserver:8080/geoserver"
     geoserver_admin_user: str = "admin"

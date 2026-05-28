@@ -9,10 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.models import ConflictReport, ExtractedPropertyData, PropertyMatch, UploadedDocument
 from app.services.agent_logs import create_agent_log, persist_agent_log, public_agent_logs
-from app.services.agents import calculate_risk_baseline, generate_risk_report
-from app.services.ai_service import ai_service
-from app.services.document_ai import extract_text, infer_property_fields
-from app.services.gis import detect_conflicts, find_best_match
+from app.services.agent_builder_tools import detect_conflicts, extract_document_entities, generate_risk_report, match_gis_parcel
+from app.services.agents import calculate_risk_baseline
 from app.services.rag import index_document_chunks
 
 EXTRACTED_PROPERTY_FIELDS = {
@@ -73,7 +71,7 @@ class PlannerAgent(WorkflowAgent):
         started_at = perf_counter()
         context.emit(
             self.name,
-            "Planning sequential workflow with shared state for document, GIS, conflict, risk, and report stages.",
+            "Planning a Google Cloud Agent Builder-compatible workflow with shared state for document, GIS, conflict, risk, and report tools.",
             status="running",
             metadata={"phase": "planning", "progress": 0.08},
         )
@@ -107,11 +105,10 @@ class DocumentAgent(WorkflowAgent):
             status="running",
             metadata={"phase": "document_ingestion", "progress": 0.2},
         )
-        raw_text = extract_text(context.document.storage_path)
-        fields, _ = ai_service.extract_property_data(raw_text=raw_text, filename=context.document.filename)
+        tool_result = extract_document_entities(document=context.document)
+        raw_text = tool_result["raw_text"]
+        fields = tool_result["fields"]
         fields = {key: value for key, value in fields.items() if key in EXTRACTED_PROPERTY_FIELDS}
-        if not fields.get("chunks"):
-            fields["chunks"] = infer_property_fields(raw_text, context.document.filename)["chunks"]
 
         context.document.raw_text = raw_text
         context.document.status = "analyzed"
@@ -176,7 +173,7 @@ class GISAgent(WorkflowAgent):
             metadata={"phase": "parcel_matching", "progress": 0.5},
         )
         extracted: ExtractedPropertyData = context.state["extracted"]
-        match = find_best_match(context.db, extracted)
+        match = match_gis_parcel(db=context.db, extracted=extracted)
         context.state["match"] = match
         if match:
             context.emit(
@@ -217,7 +214,7 @@ class ConflictAgent(WorkflowAgent):
         )
         extracted: ExtractedPropertyData = context.state["extracted"]
         match: PropertyMatch | None = context.state.get("match")
-        conflicts = detect_conflicts(context.db, extracted, match)
+        conflicts = detect_conflicts(db=context.db, extracted=extracted, match=match)
         context.state["conflicts"] = conflicts
         high_or_medium = sum(1 for item in conflicts if item.severity in {"high", "medium"})
         context.emit(

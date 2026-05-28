@@ -175,6 +175,30 @@ class AnalyzeBatchResponse(BaseModel):
     analyzed_count: int
 
 
+class MCPStatusOut(BaseModel):
+    enabled: bool
+    connected: bool
+    reason: str | None = None
+
+
+class MCPSyncResponse(BaseModel):
+    synced: bool
+    status: MCPStatusOut
+    record: dict[str, Any]
+
+
+class MCPHighRiskRecordsResponse(BaseModel):
+    status: MCPStatusOut
+    records: list[dict[str, Any]]
+
+
+class MCPComparisonResponse(BaseModel):
+    mongodb_status: MCPStatusOut
+    current_property: dict[str, Any]
+    similar_records: list[dict[str, Any]]
+    comparison: dict[str, Any]
+
+
 class StreamEvent(BaseModel):
     type: str
     delta: str | None = None

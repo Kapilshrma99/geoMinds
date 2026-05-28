@@ -19,3 +19,4 @@ chromadb==1.0.8
 reportlab==4.4.0
 google-genai
 pgvector
+pymongo==4.13.0

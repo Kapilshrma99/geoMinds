@@ -12,10 +12,39 @@ function riskTone(level) {
 
 export function ReportsPage() {
   const [reports, setReports] = useState([]);
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     api.get("/reports").then((res) => setReports(res.data));
   }, []);
+
+  const downloadReport = async (reportId) => {
+    setDownloadingId(reportId);
+    setDownloadError("");
+
+    try {
+      const response = await api.get(`/reports/${reportId}/download`, {
+        responseType: "blob",
+      });
+
+      const contentDisposition = response.headers["content-disposition"] || "";
+      const match = contentDisposition.match(/filename="([^"]+)"/i);
+      const filename = match?.[1] || `geomind-report-${reportId}.pdf`;
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      setDownloadError(error.response?.data?.detail || "Unable to download this report right now.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <SectionCard
@@ -23,6 +52,7 @@ export function ReportsPage() {
       subtitle="Review generated property reports"
       helper="Each report card summarizes one analyzed property, including the score, reasoning, recommendation, and export option."
     >
+      {downloadError ? <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{downloadError}</div> : null}
       <div className="space-y-4">
         {reports.map((report) => (
           <div key={report.id} className="rounded-[1.9rem] border border-white/10 bg-white/5 p-5">
@@ -39,15 +69,14 @@ export function ReportsPage() {
                 <div className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.2em] ${riskTone(report.risk_level)}`}>
                   {report.risk_level} risk
                 </div>
-                <a
-                  href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/reports/${report.id}/download`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => downloadReport(report.id)}
+                  disabled={downloadingId === report.id}
                   className="inline-flex items-center gap-2 rounded-2xl bg-mint px-4 py-2 text-sm font-semibold text-slate-950"
                 >
                   <Download size={16} />
-                  Export PDF
-                </a>
+                  {downloadingId === report.id ? "Downloading..." : "Export PDF"}
+                </button>
               </div>
             </div>
 

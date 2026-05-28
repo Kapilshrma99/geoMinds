@@ -6,7 +6,7 @@ from app.db.database import get_db
 from app.deps import get_current_user, require_report_access
 from app.models import AIReport, ExtractedPropertyData, UploadedDocument, User
 from app.schemas import ReportOut
-from app.services.agents import render_report_pdf
+from app.services.agent_builder_tools import generate_pdf_report
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ def get_report(report_id: int, current_user: User = Depends(get_current_user), d
 def download_report(report_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     report = db.get(AIReport, report_id)
     report = require_report_access(current_user, report, db)
-    pdf = render_report_pdf(report)
+    pdf = generate_pdf_report(report=report)
     return Response(
         content=pdf,
         media_type="application/pdf",

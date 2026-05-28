@@ -1,4 +1,4 @@
-import { AlertTriangle, FileSearch, Landmark, ShieldCheck } from "lucide-react";
+import { AlertTriangle, DatabaseZap, FileSearch, Landmark, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -14,6 +14,9 @@ export function PropertyDetailPage() {
   const [match, setMatch] = useState(null);
   const [parcels, setParcels] = useState([]);
   const [geoserverLayers, setGeoserverLayers] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -37,6 +40,19 @@ export function PropertyDetailPage() {
     if (!selected) return parcels.slice(0, 8);
     return parcels.filter((parcel) => parcel.id === selected.id || parcel.village === selected.village).slice(0, 10);
   }, [parcels, match]);
+
+  const compareWithPreviousRecords = async () => {
+    setCompareLoading(true);
+    setCompareError("");
+    try {
+      const response = await api.post(`/mcp/compare-property/${id}`);
+      setComparison(response.data);
+    } catch (error) {
+      setCompareError(error.response?.data?.detail || "Unable to compare this property with previous high-risk records right now.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -99,6 +115,75 @@ export function PropertyDetailPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-fog">
+                      <DatabaseZap size={12} />
+                      Compare With Previous High-Risk Records
+                    </div>
+                    <div className="mt-3 text-sm leading-7 text-slate-300">
+                      Pull precedent cases from the MongoDB MCP partner store and let Gemini explain whether this property resembles earlier high-risk land records.
+                    </div>
+                  </div>
+                  <button
+                    onClick={compareWithPreviousRecords}
+                    disabled={compareLoading}
+                    className="inline-flex items-center justify-center rounded-2xl bg-mint px-4 py-3 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {compareLoading ? "Comparing..." : "Compare with Previous High-Risk Records"}
+                  </button>
+                </div>
+
+                {compareError ? <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{compareError}</div> : null}
+
+                {comparison ? (
+                  <div className="mt-5 space-y-4">
+                    <div className="rounded-[1.4rem] border border-white/10 bg-storm/80 p-4">
+                      <div className="text-[11px] uppercase tracking-[0.28em] text-fog">Gemini Explanation</div>
+                      <div className="mt-3 text-sm leading-7 text-slate-200">{comparison.comparison.risk_explanation}</div>
+                      <div className="mt-3 text-sm leading-7 text-slate-300">{comparison.comparison.gemini_summary}</div>
+                      <div className="mt-4 rounded-2xl border border-mint/20 bg-mint/10 px-3 py-2 text-sm text-mint">
+                        {comparison.comparison.final_recommendation}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {(comparison.similar_records || []).map((record) => {
+                        const entities = record.extracted_entities || {};
+                        const riskReport = record.risk_report || {};
+                        return (
+                          <div key={`${record.document_id}-${entities.khasra_no || "record"}`} className="rounded-[1.4rem] border border-white/10 bg-storm/80 p-4">
+                            <div className="text-[11px] uppercase tracking-[0.28em] text-fog">Similar High-Risk Record</div>
+                            <div className="mt-3 font-display text-2xl text-haze">{entities.owner_name || "Unknown owner"}</div>
+                            <div className="mt-1 text-sm text-slate-300">
+                              Khasra {entities.khasra_no || "n/a"} • {entities.village || "Unknown village"}, {entities.district || "Unknown district"}
+                            </div>
+                            <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                              Risk score {riskReport.risk_score ?? "n/a"} • {riskReport.risk_level || "Unknown"}
+                            </div>
+                            <div className="mt-4 text-sm leading-7 text-slate-200">{riskReport.summary || "No stored summary available."}</div>
+                            <div className="mt-4 space-y-2">
+                              {(record.match_reasons || comparison.comparison.matching_reasons || []).map((reason) => (
+                                <div key={`${record.document_id}-${reason}`} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+                                  {reason}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {!comparison.similar_records?.length ? (
+                      <div className="rounded-2xl border border-white/10 bg-storm/80 px-4 py-3 text-sm text-slate-300">
+                        No prior high-risk records were returned. This usually means MongoDB MCP is not configured yet or there are no synced precedent cases.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (

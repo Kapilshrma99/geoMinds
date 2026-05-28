@@ -392,6 +392,65 @@ Document:
                 "evidence_summary": extracted_payload.get("chunks", [])[:4],
             }, logs
 
+    def compare_with_high_risk_records(
+        self,
+        *,
+        property_payload: dict[str, Any],
+        similar_records: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        prompt = (
+            "Compare the current land record against previous high-risk records from MongoDB MCP. "
+            "Return strict JSON with keys: matching_reasons, risk_explanation, final_recommendation, gemini_summary. "
+            "matching_reasons must be an array of short strings. "
+            "Current property: "
+            f"{json.dumps(property_payload)} "
+            "Previous high-risk records: "
+            f"{json.dumps(similar_records)}"
+        )
+        system_instruction = (
+            "You are GeoMind AI's precedent comparison agent running on Gemini/Vertex AI inside a Google Cloud Agent Builder workflow. "
+            "Identify concrete similarities such as shared geography, owner overlap, khasra overlap, recurring conflict patterns, or similarly elevated risk posture. "
+            "Keep the explanation concise, specific, and suitable for a hackathon demo judge."
+        )
+        try:
+            return self._generate_json(
+                model=settings.gemini_model,
+                prompt=prompt,
+                system_instruction=system_instruction,
+            )
+        except Exception:
+            if not similar_records:
+                return {
+                    "matching_reasons": ["No prior high-risk record was available from MongoDB MCP."],
+                    "risk_explanation": "The current property can still be evaluated from GIS conflicts and the generated risk report, but there is no precedent case to compare against.",
+                    "final_recommendation": "Proceed with the current GeoMind evidence trail and sync more cases into MongoDB MCP for stronger comparisons.",
+                    "gemini_summary": "No precedent comparison available.",
+                }
+
+            top_record = similar_records[0]
+            top_entities = top_record.get("extracted_entities") or {}
+            top_report = top_record.get("risk_report") or {}
+            reasons: list[str] = []
+            if property_payload.get("village") and property_payload.get("village") == top_entities.get("village"):
+                reasons.append(f"Same village: {property_payload.get('village')}")
+            if property_payload.get("district") and property_payload.get("district") == top_entities.get("district"):
+                reasons.append(f"Same district: {property_payload.get('district')}")
+            if property_payload.get("khasra_no") and property_payload.get("khasra_no") == top_entities.get("khasra_no"):
+                reasons.append(f"Matching khasra number: {property_payload.get('khasra_no')}")
+            if property_payload.get("owner_name") and property_payload.get("owner_name") == top_entities.get("owner_name"):
+                reasons.append(f"Matching owner name: {property_payload.get('owner_name')}")
+            if not reasons:
+                reasons.append("Similar precedent selected from previously synced high-risk GeoMind cases.")
+            return {
+                "matching_reasons": reasons,
+                "risk_explanation": (
+                    f"The current property resembles prior high-risk case document {top_record.get('document_id')} "
+                    f"which was rated {top_report.get('risk_level', 'High')} risk with score {top_report.get('risk_score', 'n/a')}."
+                ),
+                "final_recommendation": "Escalate for legal and field verification when current conflicts align with the precedent case.",
+                "gemini_summary": "Fallback comparison used a deterministic precedent match because Gemini comparison was unavailable.",
+            }
+
     def answer_gis_query(
         self,
         *,
